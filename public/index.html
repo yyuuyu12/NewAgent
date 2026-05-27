@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>爆款选题工作台</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --primary-light: #e0e7ff;
+    --accent: #10b981;
+    --danger: #ef4444;
+    --bg: #f8f9ff;
+    --card: #ffffff;
+    --text: #1e1b4b;
+    --text-2: #6b7280;
+    --border: #e5e7eb;
+    --radius: 14px;
+    --shadow: 0 2px 12px rgba(99,102,241,.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ===== 顶部 Header ===== */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+    color: white;
+    padding: 16px 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-sub { font-size: 11px; opacity: .7; margin-top: 2px; }
+  .login-btn {
+    background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.3);
+    color: white; padding: 6px 14px; border-radius: 20px; font-size: 13px;
+    cursor: pointer; transition: .2s;
+  }
+  .login-btn:hover { background: rgba(255,255,255,.35); }
+  .user-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.15); border-radius: 20px; padding: 5px 12px;
+  }
+  .user-avatar { width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,.3); display: flex; align-items: center; justify-content: center; font-size: 12px; }
+  .user-name { font-size: 13px; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ===== Tab Bar ===== */
+  .tab-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--card); border-top: 1px solid var(--border);
+    display: flex; z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .tab-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0 8px; cursor: pointer; transition: color .2s;
+    color: var(--text-2); font-size: 11px; gap: 4px;
+  }
+  .tab-item.active { color: var(--primary); }
+  .tab-icon { font-size: 22px; line-height: 1; }
+
+  /* ===== Content ===== */
+  .content { padding: 16px 16px 90px; max-width: 680px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ===== Cards ===== */
+  .card {
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 18px;
+    margin-bottom: 14px; border: 1px solid rgba(99,102,241,.06);
+  }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .card-title .icon { font-size: 18px; }
+
+  /* ===== Form Elements ===== */
+  .input-group { margin-bottom: 12px; }
+  .input-group label { font-size: 13px; color: var(--text-2); margin-bottom: 6px; display: block; }
+  input[type=text], input[type=tel], input[type=password], textarea {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; font-size: 14px; background: var(--bg);
+    outline: none; transition: border-color .2s; font-family: inherit;
+    color: var(--text);
+  }
+  input:focus, textarea:focus { border-color: var(--primary); background: white; }
+  textarea { resize: vertical; min-height: 100px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all .2s; border: none; outline: none;
+    width: 100%; letter-spacing: .3px;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 15px rgba(99,102,241,.3); }
+  .btn-secondary { background: var(--primary-light); color: var(--primary); }
+  .btn-secondary:hover:not(:disabled) { background: #c7d2fe; }
+  .btn-ghost { background: transparent; color: var(--text-2); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-sm { padding: 7px 14px; font-size: 12px; width: auto; border-radius: 8px; }
+  .btn:disabled { opacity: .6; cursor: not-allowed; transform: none !important; }
+
+  /* ===== Result Items ===== */
+  .result-list { margin-top: 8px; }
+  .result-item {
+    background: var(--bg); border-radius: 10px; padding: 14px;
+    margin-bottom: 10px; border: 1px solid var(--border); position: relative;
+  }
+  .result-item-text { font-size: 14px; line-height: 1.7; color: var(--text); white-space: pre-wrap; word-break: break-all; }
+  .result-item-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .result-num {
+    position: absolute; top: 10px; right: 12px;
+    background: var(--primary); color: white; border-radius: 6px;
+    font-size: 11px; padding: 2px 7px; font-weight: 600;
+  }
+
+  /* ===== Topic Items ===== */
+  .topic-item {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg); border-radius: 10px; padding: 14px;
+    margin-bottom: 8px; border: 1px solid var(--border); cursor: default;
+    transition: border-color .2s;
+  }
+  .topic-item:hover { border-color: var(--primary); }
+  .topic-index { width: 24px; height: 24px; border-radius: 6px; background: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .topic-text { flex: 1; font-size: 14px; line-height: 1.5; }
+  .topic-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* ===== Inspire Cards ===== */
+  .inspire-item {
+    background: var(--card); border-radius: 12px; padding: 16px;
+    margin-bottom: 12px; border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .inspire-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .inspire-tag { background: var(--primary-light); color: var(--primary); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; }
+  .inspire-likes { font-size: 12px; color: var(--text-2); display: flex; align-items: center; gap: 4px; }
+  .inspire-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; line-height: 1.5; }
+  .inspire-script { font-size: 13px; color: var(--text-2); line-height: 1.7; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .inspire-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+  /* ===== History Items ===== */
+  .history-item {
+    background: var(--bg); border-radius: 10px; padding: 14px;
+    margin-bottom: 10px; border: 1px solid var(--border);
+  }
+  .history-time { font-size: 11px; color: var(--text-2); margin-bottom: 8px; }
+  .history-original { font-size: 12px; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; padding: 8px; background: rgba(0,0,0,.03); border-radius: 6px; margin-bottom: 8px; }
+  .history-actions { display: flex; gap: 8px; }
+
+  /* ===== Extracted Script Area ===== */
+  .extracted-box {
+    background: var(--bg); border: 1.5px solid var(--primary-light);
+    border-radius: 10px; padding: 14px; margin-top: 14px;
+    font-size: 13px; line-height: 1.8; color: var(--text);
+    white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto;
+  }
+  .extracted-meta { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--text-2); }
+
+  /* ===== Login Modal ===== */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    z-index: 1000; display: none; align-items: flex-end; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 24px 24px 0 0;
+    padding: 24px 24px 40px; width: 100%; max-width: 480px;
+    animation: slideUp .3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; text-align: center; }
+  .modal-tabs { display: flex; gap: 0; margin-bottom: 20px; background: var(--bg); border-radius: 10px; padding: 4px; }
+  .modal-tab { flex: 1; text-align: center; padding: 9px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text-2); transition: all .2s; }
+  .modal-tab.active { background: white; color: var(--primary); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  .modal-panel { display: none; }
+  .modal-panel.active { display: block; }
+  .sms-row { display: flex; gap: 8px; }
+  .sms-row input { flex: 1; }
+  .send-code-btn { white-space: nowrap; width: auto; flex-shrink: 0; font-size: 13px; padding: 12px 14px; }
+
+  /* ===== Toast ===== */
+  .toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: rgba(30,27,75,.9); color: white; padding: 10px 20px;
+    border-radius: 24px; font-size: 13px; z-index: 2000;
+    opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* ===== Skeleton / Loading ===== */
+  .loading { text-align: center; padding: 40px 20px; color: var(--text-2); font-size: 14px; }
+  .loading-spinner {
+    width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--primary);
+    border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 50px 20px; color: var(--text-2); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+  /* ===== User Panel ===== */
+  .user-panel { text-align: center; padding: 30px 20px 20px; }
+  .user-panel-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--primary-light); margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+  .user-panel-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .user-panel-phone { font-size: 13px; color: var(--text-2); }
+  .stats-row { display: flex; gap: 12px; margin: 20px 0; }
+  .stat-box { flex: 1; background: var(--bg); border-radius: 12px; padding: 16px; text-align: center; }
+  .stat-num { font-size: 22px; font-weight: 700; color: var(--primary); }
+  .stat-label { font-size: 11px; color: var(--text-2); margin-top: 4px; }
+
+  /* ===== Search bar (inspire) ===== */
+  .search-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .search-row input { flex: 1; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; }
+  .filter-chip {
+    white-space: nowrap; padding: 6px 14px; border-radius: 20px; font-size: 12px;
+    background: var(--card); border: 1.5px solid var(--border); cursor: pointer; transition: all .2s;
+  }
+  .filter-chip.active { background: var(--primary); border-color: var(--primary); color: white; }
+
+  /* ===== Desktop adjustments ===== */
+  @media (min-width: 640px) {
+    .tab-bar { position: static; border-top: none; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+    .tab-item { flex-direction: row; padding: 14px 0; font-size: 14px; gap: 8px; }
+    .tab-icon { font-size: 18px; }
+    .content { padding: 24px 24px 24px; }
+    .modal-overlay { align-items: center; }
+    .modal { border-radius: 24px; }
+    .toast { bottom: 40px; }
+    .versions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .versions-grid .result-item { margin-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="header-title">✍️ 爆款选题工作台</div>
+    <div class="header-sub">选题 · 提取 · 改写，一键搞定</div>
+  </div>
+  <div id="headerRight">
+    <button class="login-btn" onclick="openLogin()">登录 / 注册</button>
+  </div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <div class="tab-item active" data-tab="discover" onclick="switchTab('discover', this)">
+    <span class="tab-icon">💡</span><span>发现选题</span>
+  </div>
+  <div class="tab-item" data-tab="extract" onclick="switchTab('extract', this)">
+    <span class="tab-icon">📥</span><span>提取文案</span>
+  </div>
+  <div class="tab-item" data-tab="rewrite" onclick="switchTab('rewrite', this)">
+    <span class="tab-icon">✨</span><span>AI 改写</span>
+  </div>
+  <div class="tab-item" data-tab="mine" onclick="switchTab('mine', this)">
+    <span class="tab-icon">👤</span><span>我的</span>
+  </div>
+</div>
+
+<!-- Content -->
+<div class="content">
+
+  <!-- ===== 发现选题 ===== -->
+  <div class="panel active" id="panel-discover">
+    <div class="card">
+      <div class="card-title"><span class="icon">💡</span> AI 生成爆款选题</div>
+      <div class="input-group">
+        <label>输入关键词（行业/品类/话题）</label>
+        <input type="text" id="topicKeyword" placeholder="例如：护肤品、宠物狗、减脂餐..." maxlength="30">
+      </div>
+      <button class="btn btn-primary" id="topicBtn" onclick="generateTopics()">
+        <span>🔥</span> 生成10个爆款选题
+      </button>
+    </div>
+
+    <div id="topicsResult" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 2px">
+        <span style="font-size:14px;font-weight:600;color:var(--text-2)">选题建议 · 点击一键改写</span>
+        <button class="btn btn-ghost btn-sm" onclick="generateTopics()">🔄 换一批</button>
+      </div>
+      <div id="topicsList" class="result-list"></div>
+    </div>
+
+    <!-- 行业灵感 -->
+    <div class="card" style="margin-top:8px">
+      <div class="card-title"><span class="icon">📖</span> 行业精选文案</div>
+      <div class="filter-row" id="industryFilters">
+        <div class="filter-chip active" onclick="filterInspire('', this)">全部</div>
+      </div>
+      <div class="search-row">
+        <input type="text" id="inspireKeyword" placeholder="搜索文案内容..." onkeydown="if(event.key==='Enter')searchInspire()">
+        <button class="btn btn-secondary btn-sm" style="width:auto;padding:12px 18px" onclick="searchInspire()">搜索</button>
+      </div>
+      <div id="inspireList"></div>
+      <div id="inspireMore" style="display:none;margin-top:8px">
+        <button class="btn btn-ghost" onclick="loadMoreInspire()">加载更多</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 提取文案 ===== -->
+  <div class="panel" id="panel-extract">
+    <div class="card">
+      <div class="card-title"><span class="icon">📥</span> 抖音视频文案提取</div>
+      <div class="input-group">
+        <label>粘贴抖音视频链接</label>
+        <textarea id="extractUrl" placeholder="粘贴抖音/短视频链接，支持 v.douyin.com 短链" style="min-height:80px" rows="3"></textarea>
+      </div>
+      <button class="btn btn-primary" id="extractBtn" onclick="extractVideo()">
+        <span>📥</span> 提取文案
+      </button>
+    </div>
+
+    <div id="extractResult" style="display:none">
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="card-title" style="margin-bottom:0"><span class="icon">📄</span> 原始文案</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="copyExtracted()">复制</button>
+            <button class="btn btn-primary btn-sm" onclick="sendToRewrite()">去改写 →</button>
+          </div>
+        </div>
+        <div class="extracted-box" id="extractedScript"></div>
+        <div class="extracted-meta" id="extractedMeta"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== AI 改写 ===== -->
+  <div class="panel" id="panel-rewrite">
+    <div class="card">
+      <div class="card-title"><span class="icon">✨</span> AI 仿写改造（绕过查重）</div>
+      <div class="input-group">
+        <label>输入原始文案（粘贴或从提取/灵感带入）</label>
+        <textarea id="rewriteInput" placeholder="粘贴要改写的文案..." style="min-height:140px"></textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;color:var(--text-2)">
+        <span>💬</span>保留原文风格结构，换词换句，一键生成3个版本
+      </div>
+      <button class="btn btn-primary" id="rewriteBtn" onclick="doRewrite()">
+        <span>✨</span> 生成3个改写版本
+      </button>
+    </div>
+
+    <div id="rewriteResult" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 2px">
+        <span style="font-size:14px;font-weight:600">改写结果</span>
+        <button class="btn btn-ghost btn-sm" onclick="doRewrite()">🔄 重新生成</button>
+      </div>
+      <div class="versions-grid" id="versionsList"></div>
+    </div>
+  </div>
+
+  <!-- ===== 我的 ===== -->
+  <div class="panel" id="panel-mine">
+    <!-- 未登录状态 -->
+    <div id="notLoggedIn" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:48px;margin-bottom:16px">👤</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:8px">登录查看历史记录</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:20px">同一账号可在多端同步使用</div>
+      <button class="btn btn-primary" onclick="openLogin()">立即登录</button>
+    </div>
+
+    <!-- 已登录状态 -->
+    <div id="loggedInPanel" style="display:none">
+      <div class="card user-panel">
+        <div class="user-panel-avatar">😊</div>
+        <div class="user-panel-name" id="userPanelName">--</div>
+        <div class="user-panel-phone" id="userPanelPhone">--</div>
+        <div class="stats-row">
+          <div class="stat-box">
+            <div class="stat-num" id="todayUsed">--</div>
+            <div class="stat-label">今日已用</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num" id="dailyLimit">--</div>
+            <div class="stat-label">每日上限</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num" id="totalHistory">--</div>
+            <div class="stat-label">总改写次数</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost" style="margin-top:4px" onclick="logout()">退出登录</button>
+      </div>
+
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;padding:0 2px">最近改写记录</div>
+      <div id="historyList"></div>
+      <div id="historyEmpty" class="empty" style="display:none">
+        <div class="empty-icon">📝</div>
+        <div>还没有改写记录</div>
+        <div style="font-size:12px;margin-top:6px;color:#9ca3af">去 AI 改写 标签开始创作</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Login Modal -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal">
+    <div class="modal-title">登录 / 注册</div>
+    <div class="modal-tabs">
+      <div class="modal-tab active" onclick="switchLoginTab('sms', this)">验证码登录</div>
+      <div class="modal-tab" onclick="switchLoginTab('pwd', this)">密码登录</div>
+    </div>
+
+    <!-- SMS -->
+    <div class="modal-panel active" id="modal-sms">
+      <div class="input-group">
+        <label>手机号</label>
+        <input type="tel" id="loginPhone" placeholder="请输入手机号" maxlength="11">
+      </div>
+      <div class="input-group">
+        <label>验证码</label>
+        <div class="sms-row">
+          <input type="text" id="loginCode" placeholder="6位验证码" maxlength="6">
+          <button class="btn btn-secondary send-code-btn" id="sendCodeBtn" onclick="sendSmsCode()">发送验证码</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="smsLogin()">登录 / 注册</button>
+    </div>
+
+    <!-- Password -->
+    <div class="modal-panel" id="modal-pwd">
+      <div class="input-group">
+        <label>手机号</label>
+        <input type="tel" id="pwdPhone" placeholder="请输入手机号" maxlength="11">
+      </div>
+      <div class="input-group">
+        <label>密码</label>
+        <input type="password" id="pwdPass" placeholder="请输入密码（至少6位）">
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:0">
+        <button class="btn btn-primary" style="flex:1" onclick="pwdLogin()">登录</button>
+        <button class="btn btn-secondary" style="flex:1" onclick="pwdRegister()">注册</button>
+      </div>
+    </div>
+
+    <button class="btn btn-ghost" style="margin-top:12px" onclick="closeLogin()">取消</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let user = null;
+let token = localStorage.getItem('cw_token');
+
+// ==================== 初始化 ====================
+async function init() {
+  if (token) {
+    try {
+      const r = await api('/api/auth/me');
+      if (r.code === 200) {
+        user = r.data;
+        updateHeader();
+        loadMinePanel();
+      } else {
+        token = null; localStorage.removeItem('cw_token');
+      }
+    } catch { token = null; localStorage.removeItem('cw_token'); }
+  }
+  loadIndustries();
+  loadInspire();
+}
+
+// ==================== API 工具 ====================
+async function api(url, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + url, opts);
+  return r.json();
+}
+
+function requireLogin(fn) {
+  if (!user) { openLogin(); return; }
+  fn();
+}
+
+// ==================== Toast ====================
+function toast(msg, dur = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ==================== Tab切换 ====================
+function switchTab(name, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'mine' && user) loadMinePanel();
+}
+
+// ==================== Header ====================
+function updateHeader() {
+  const el = document.getElementById('headerRight');
+  if (user) {
+    el.innerHTML = `<div class="user-chip"><div class="user-avatar">😊</div><span class="user-name">${user.nickname || user.phone}</span></div>`;
+  } else {
+    el.innerHTML = `<button class="login-btn" onclick="openLogin()">登录 / 注册</button>`;
+  }
+}
+
+// ==================== Login Modal ====================
+function openLogin() {
+  document.getElementById('loginModal').classList.add('show');
+}
+function closeLogin() {
+  document.getElementById('loginModal').classList.remove('show');
+}
+function switchLoginTab(name, el) {
+  document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.modal-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('modal-' + name).classList.add('active');
+}
+
+let smsCountdown = 0;
+async function sendSmsCode() {
+  if (smsCountdown > 0) return;
+  const phone = document.getElementById('loginPhone').value.trim();
+  if (!/^1[3-9]\d{9}$/.test(phone)) return toast('手机号格式不正确');
+  const btn = document.getElementById('sendCodeBtn');
+  btn.disabled = true;
+  const r = await api('/api/auth/send-sms', 'POST', { phone });
+  if (r.code === 200) {
+    toast('验证码已发送');
+    smsCountdown = 60;
+    const timer = setInterval(() => {
+      btn.textContent = `${smsCountdown}s 后重发`;
+      smsCountdown--;
+      if (smsCountdown < 0) { clearInterval(timer); btn.textContent = '发送验证码'; btn.disabled = false; }
+    }, 1000);
+  } else {
+    toast(r.msg || '发送失败'); btn.disabled = false;
+  }
+}
+
+async function smsLogin() {
+  const phone = document.getElementById('loginPhone').value.trim();
+  const code = document.getElementById('loginCode').value.trim();
+  if (!phone || !code) return toast('请填写手机号和验证码');
+  const r = await api('/api/auth/sms-login', 'POST', { phone, code });
+  if (r.code === 200) {
+    token = r.data.token; user = r.data.user;
+    localStorage.setItem('cw_token', token);
+    updateHeader(); closeLogin(); toast(r.msg || '登录成功');
+    loadMinePanel();
+  } else toast(r.msg || '登录失败');
+}
+
+async function pwdLogin() {
+  const phone = document.getElementById('pwdPhone').value.trim();
+  const password = document.getElementById('pwdPass').value;
+  if (!phone || !password) return toast('请填写手机号和密码');
+  const r = await api('/api/auth/login', 'POST', { phone, password });
+  if (r.code === 200) {
+    token = r.data.token; user = r.data.user;
+    localStorage.setItem('cw_token', token);
+    updateHeader(); closeLogin(); toast('登录成功');
+    loadMinePanel();
+  } else toast(r.msg || '登录失败');
+}
+
+async function pwdRegister() {
+  const phone = document.getElementById('pwdPhone').value.trim();
+  const password = document.getElementById('pwdPass').value;
+  if (!phone || !password) return toast('请填写手机号和密码');
+  if (password.length < 6) return toast('密码至少6位');
+  const r = await api('/api/auth/register', 'POST', { phone, password });
+  if (r.code === 200) {
+    token = r.data.token; user = r.data.user;
+    localStorage.setItem('cw_token', token);
+    updateHeader(); closeLogin(); toast('注册成功');
+    loadMinePanel();
+  } else toast(r.msg || '注册失败');
+}
+
+function logout() {
+  token = null; user = null;
+  localStorage.removeItem('cw_token');
+  updateHeader();
+  document.getElementById('loggedInPanel').style.display = 'none';
+  document.getElementById('notLoggedIn').style.display = '';
+  toast('已退出登录');
+}
+
+// ==================== 发现选题 ====================
+async function generateTopics() {
+  requireLogin(() => _generateTopics());
+}
+async function _generateTopics() {
+  const keyword = document.getElementById('topicKeyword').value.trim();
+  if (!keyword) return toast('请输入关键词');
+  const btn = document.getElementById('topicBtn');
+  btn.disabled = true; btn.textContent = '⏳ 生成中...';
+
+  const r = await api('/api/rewrite/topics', 'POST', { keyword });
+  btn.disabled = false; btn.innerHTML = '<span>🔥</span> 生成10个爆款选题';
+
+  if (r.code !== 200) return toast(r.msg || '生成失败');
+
+  document.getElementById('topicsResult').style.display = '';
+  const list = document.getElementById('topicsList');
+  list.innerHTML = r.data.topics.map((t, i) => `
+    <div class="topic-item">
+      <div class="topic-index">${i + 1}</div>
+      <div class="topic-text">${escHtml(t)}</div>
+      <div class="topic-actions">
+        <button class="btn btn-ghost btn-sm" onclick="copyText(${JSON.stringify(t)})">复制</button>
+        <button class="btn btn-primary btn-sm" onclick="useTopicForRewrite(${JSON.stringify(t)})">去改写</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function useTopicForRewrite(text) {
+  document.getElementById('rewriteInput').value = text;
+  switchTab('rewrite', document.querySelector('[data-tab="rewrite"]'));
+  toast('已填入改写框');
+}
+
+// ==================== 行业灵感 ====================
+let inspireCurrentIndustry = '';
+let inspirePage = 1;
+
+async function loadIndustries() {
+  if (!user) return;
+  const r = await api('/api/inspire/industries');
+  if (r.code !== 200) return;
+  const container = document.getElementById('industryFilters');
+  const chips = r.data.map(ind => `<div class="filter-chip" onclick="filterInspire('${escHtml(ind)}', this)">${escHtml(ind)}</div>`).join('');
+  container.innerHTML = `<div class="filter-chip active" onclick="filterInspire('', this)">全部</div>` + chips;
+}
+
+function filterInspire(industry, el) {
+  document.querySelectorAll('#industryFilters .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  inspireCurrentIndustry = industry;
+  inspirePage = 1;
+  document.getElementById('inspireList').innerHTML = '';
+  loadInspire();
+}
+
+function searchInspire() {
+  inspirePage = 1;
+  document.getElementById('inspireList').innerHTML = '';
+  loadInspire();
+}
+
+let inspireTotal = 0;
+async function loadInspire() {
+  if (!user) {
+    document.getElementById('inspireList').innerHTML = '<div class="empty"><div class="empty-icon">🔒</div><div>登录后查看精选文案</div></div>';
+    return;
+  }
+  const keyword = document.getElementById('inspireKeyword').value.trim();
+  const params = new URLSearchParams({ page: inspirePage, limit: 10 });
+  if (inspireCurrentIndustry) params.append('industry', inspireCurrentIndustry);
+  if (keyword) params.append('keyword', keyword);
+
+  const r = await api(`/api/inspire/videos?${params}`);
+  if (r.code !== 200) return;
+
+  inspireTotal = r.data.total;
+  const list = document.getElementById('inspireList');
+  if (r.data.list.length === 0 && inspirePage === 1) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><div>暂无相关文案</div></div>';
+    document.getElementById('inspireMore').style.display = 'none';
+    return;
+  }
+
+  list.insertAdjacentHTML('beforeend', r.data.list.map(v => `
+    <div class="inspire-item">
+      <div class="inspire-meta">
+        ${v.industry ? `<span class="inspire-tag">${escHtml(v.industry)}</span>` : ''}
+        <span class="inspire-likes">❤️ ${formatNum(v.likes_count)}</span>
+        ${v.duration ? `<span class="inspire-likes">⏱ ${Math.round(v.duration)}s</span>` : ''}
+      </div>
+      <div class="inspire-title">${escHtml(v.title || '无标题')}</div>
+      <div class="inspire-script">${escHtml(v.script || '')}</div>
+      <div class="inspire-actions">
+        <button class="btn btn-ghost btn-sm" onclick="copyText(${JSON.stringify(v.script || '')})">复制文案</button>
+        <button class="btn btn-primary btn-sm" onclick="sendScriptToRewrite(${JSON.stringify(v.script || '')})">改写</button>
+      </div>
+    </div>
+  `).join(''));
+
+  const shown = inspirePage * 10;
+  document.getElementById('inspireMore').style.display = shown < inspireTotal ? '' : 'none';
+}
+
+async function loadMoreInspire() {
+  inspirePage++;
+  await loadInspire();
+}
+
+function sendScriptToRewrite(script) {
+  document.getElementById('rewriteInput').value = script;
+  switchTab('rewrite', document.querySelector('[data-tab="rewrite"]'));
+  toast('已填入改写框');
+}
+
+// ==================== 提取文案 ====================
+let extractedText = '';
+
+async function extractVideo() {
+  requireLogin(() => _extractVideo());
+}
+async function _extractVideo() {
+  const url = document.getElementById('extractUrl').value.trim();
+  if (!url) return toast('请输入视频链接');
+  const btn = document.getElementById('extractBtn');
+  btn.disabled = true; btn.innerHTML = '<span>⏳</span> 提取中，请稍候...';
+
+  const r = await api('/api/extract/video', 'POST', { url });
+  btn.disabled = false; btn.innerHTML = '<span>📥</span> 提取文案';
+
+  if (r.code !== 200) return toast(r.msg || '提取失败');
+
+  extractedText = r.data.script;
+  document.getElementById('extractedScript').textContent = r.data.script;
+  document.getElementById('extractedMeta').innerHTML = `
+    <span>👤 ${escHtml(r.data.author)}</span>
+    <span>❤️ ${formatNum(r.data.likes)}</span>
+    <span>📋 剩余 ${r.data.remaining} 次</span>
+  `;
+  document.getElementById('extractResult').style.display = '';
+}
+
+function copyExtracted() {
+  copyText(extractedText);
+}
+
+function sendToRewrite() {
+  if (!extractedText) return toast('请先提取文案');
+  document.getElementById('rewriteInput').value = extractedText;
+  switchTab('rewrite', document.querySelector('[data-tab="rewrite"]'));
+  toast('已填入改写框');
+}
+
+// ==================== AI 改写 ====================
+async function doRewrite() {
+  requireLogin(() => _doRewrite());
+}
+async function _doRewrite() {
+  const text = document.getElementById('rewriteInput').value.trim();
+  if (!text) return toast('请输入要改写的文案');
+  if (text.length < 10) return toast('文案内容太短');
+
+  const btn = document.getElementById('rewriteBtn');
+  btn.disabled = true; btn.innerHTML = '<span>⏳</span> AI 改写中，请稍候...';
+  document.getElementById('rewriteResult').style.display = 'none';
+
+  const r = await api('/api/rewrite/generate', 'POST', { text });
+  btn.disabled = false; btn.innerHTML = '<span>✨</span> 生成3个改写版本';
+
+  if (r.code !== 200) return toast(r.msg || '改写失败');
+
+  document.getElementById('rewriteResult').style.display = '';
+  const vlist = document.getElementById('versionsList');
+  vlist.innerHTML = r.data.versions.map((v, i) => `
+    <div class="result-item">
+      <div class="result-num">版本 ${i + 1}</div>
+      <div class="result-item-text">${escHtml(v)}</div>
+      <div class="result-item-actions">
+        <button class="btn btn-primary btn-sm" onclick="copyText(${JSON.stringify(v)})">📋 复制</button>
+        <button class="btn btn-ghost btn-sm" onclick="useAsNew(${JSON.stringify(v)})">用这个再改写</button>
+      </div>
+    </div>
+  `).join('');
+
+  vlist.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (r.data.remaining !== undefined) toast(`改写成功！今日剩余 ${r.data.remaining} 次`);
+}
+
+function useAsNew(text) {
+  document.getElementById('rewriteInput').value = text;
+  document.getElementById('rewriteResult').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast('已填入，可继续改写');
+}
+
+// ==================== 我的 ====================
+async function loadMinePanel() {
+  if (!user) return;
+  document.getElementById('notLoggedIn').style.display = 'none';
+  document.getElementById('loggedInPanel').style.display = '';
+  document.getElementById('userPanelName').textContent = user.nickname || '未设置昵称';
+  document.getElementById('userPanelPhone').textContent = user.phone ? user.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : '';
+  document.getElementById('dailyLimit').textContent = user.daily_limit || 20;
+
+  // 加载历史
+  const r = await api('/api/history?limit=10');
+  if (r.code === 200) {
+    document.getElementById('totalHistory').textContent = r.data.total;
+    if (r.data.list.length === 0) {
+      document.getElementById('historyEmpty').style.display = '';
+      document.getElementById('historyList').innerHTML = '';
+    } else {
+      document.getElementById('historyEmpty').style.display = 'none';
+      document.getElementById('historyList').innerHTML = r.data.list.map(h => `
+        <div class="history-item">
+          <div class="history-time">${formatDate(h.created_at)} · ${h.source_type === 'extract' ? '从视频提取' : h.source_type === 'inspire' ? '行业灵感' : '手动输入'}</div>
+          <div class="history-original">${escHtml((h.original || '').slice(0, 100))}</div>
+          <div class="history-actions">
+            <button class="btn btn-ghost btn-sm" onclick="rewriteHistoryItem(${JSON.stringify(h.original || '')})">重新改写</button>
+            <button class="btn btn-ghost btn-sm" onclick="deleteHistory(${h.id}, this)">删除</button>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+}
+
+function rewriteHistoryItem(text) {
+  document.getElementById('rewriteInput').value = text;
+  switchTab('rewrite', document.querySelector('[data-tab="rewrite"]'));
+}
+
+async function deleteHistory(id, btn) {
+  btn.disabled = true;
+  const r = await api(`/api/history/${id}`, 'DELETE');
+  if (r.code === 200) { btn.closest('.history-item').remove(); toast('已删除'); }
+  else { btn.disabled = false; toast(r.msg || '删除失败'); }
+}
+
+// ==================== 工具函数 ====================
+function copyText(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => toast('已复制到剪贴板'));
+  } else {
+    const el = document.createElement('textarea');
+    el.value = text; el.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(el); el.select();
+    document.execCommand('copy'); document.body.removeChild(el);
+    toast('已复制到剪贴板');
+  }
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatNum(n) {
+  if (!n) return '0';
+  if (n >= 10000) return (n / 10000).toFixed(1) + 'w';
+  return String(n);
+}
+
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+// 点击蒙层关闭 modal
+document.getElementById('loginModal').addEventListener('click', function(e) {
+  if (e.target === this) closeLogin();
+});
+
+init();
+</script>
+</body>
+</html>

@@ -1471,7 +1471,17 @@ function render() {
   // 保存 blob video 节点，渲染后复用，避免视频闪烁
   const oldVideo = document.querySelector('#app video[src^="blob:"]');
   const oldVideoSrc = oldVideo ? oldVideo.src : null;
-  document.getElementById('app').innerHTML = tMain();
+  let _html;
+  try { _html = tMain(); } catch(e) {
+    console.error('[render error]', e);
+    document.getElementById('app').innerHTML = `<div style="padding:60px 24px;text-align:center;">
+      <div style="font-size:15px;font-weight:600;color:#EF4444;margin-bottom:8px;">页面渲染异常</div>
+      <div style="font-size:12px;color:#9C8E7A;margin-bottom:4px;word-break:break-all">${e.message||e}</div>
+      <div style="margin-top:20px;background:#FF6B35;color:#fff;border-radius:10px;padding:12px 24px;cursor:pointer;display:inline-block;" onclick="location.reload()">刷新重试</div>
+    </div>`;
+    return;
+  }
+  document.getElementById('app').innerHTML = _html;
   _lastRenderedViewKey = newViewKey;
   if (oldVideoSrc) {
     const newVideo = document.querySelector('#app video');
@@ -1691,7 +1701,7 @@ function tTopBar() {
       <div style="width:36px;flex-shrink:0"></div>
     </div>`;
   }
-  if (t === 'home' || t === 'profile') {
+  if (t === 'home' || t === 'profile' || t === 'agents') {
     const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '';
     return `<div class="top-bar"><span class="app-name">爆款文案工坊</span>${loginHint}</div>`;
   }

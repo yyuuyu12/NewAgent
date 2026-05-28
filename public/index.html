@@ -1671,6 +1671,7 @@ function tMain() {
     ${S.showAvatarMgmt?tAvatarMgmt():''}
     ${S.avatarSavePrompt?tAvatarSavePrompt():''}
     ${S.showSetPwdSheet?tSetPasswordSheet():''}
+    ${S.selectedAgent?tAgentDetailOverlay():''}
   </div>`;
 }
 
@@ -4263,6 +4264,8 @@ function switchTab(tab) {
     prevTab: S.currentTab,
     currentTab: tab,
     nicknamePrompt: false,
+    // 离开智能体时关闭详情弹层
+    ...(tab !== 'agents' ? { selectedAgent: null, agentResult: null, agentErr: '' } : {}),
     ...(resetProfile ? { profileView: 'main', avatarCropOpen: false, avatarCropDataUrl: '' } : {}),
   });
   if (tab === 'profile') fetchMe();
@@ -7212,7 +7215,7 @@ function dismissNicknamePrompt() {
 // ===== 智能体 =====
 
 function tAgents() {
-  const { agentsList, agentsLoading, selectedAgent, agentInputs, agentRunning, agentResult, agentErr, creditsBalance } = S;
+  const { agentsList, agentsLoading, creditsBalance } = S;
 
   if (!getToken()) {
     return `<div class="page-wrap" style="padding:60px 24px;text-align:center;">
@@ -7244,60 +7247,61 @@ function tAgents() {
         `).join('')}
       </div>`;
 
-  const detailHtml = selectedAgent ? `
-    <div class="agent-detail-overlay" onclick="if(event.target===this)closeAgentDetail()">
-      <div class="agent-detail-sheet">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div style="font-size:36px;line-height:1;">${selectedAgent.emoji || '🤖'}</div>
-            <div>
-              <div style="font-size:18px;font-weight:700;color:#1C1A16;">${selectedAgent.name}</div>
-              <div style="font-size:13px;color:#9C8E7A;margin-top:2px;">${selectedAgent.description}</div>
-            </div>
-          </div>
-          <div onclick="closeAgentDetail()" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#F5F4F1;cursor:pointer;flex-shrink:0;font-size:14px;color:#9C8E7A;">✕</div>
-        </div>
-        <div style="margin-bottom:16px;display:flex;align-items:center;gap:6px;">
-          <span style="font-size:13px;color:#9C8E7A;">消耗积分：</span>
-          <span style="font-size:14px;font-weight:700;color:#F97316;">⚡ ${selectedAgent.credits_cost} 分</span>
-          ${creditsBalance !== null ? `<span style="font-size:12px;color:#9C8E7A;margin-left:4px;">（余额 ${creditsBalance} 分）</span>` : ''}
-        </div>
-        ${(selectedAgent.input_fields || []).map(f => `
-          <div class="agent-field-label">${f.label}</div>
-          ${f.type === 'textarea'
-            ? `<textarea class="agent-field-input" rows="3" placeholder="${(f.placeholder||'').replace(/"/g,'&quot;')}" oninput="setAgentInput('${f.key}',this.value)">${agentInputs[f.key]||''}</textarea>`
-            : f.type === 'select'
-            ? `<select class="agent-field-select" onchange="setAgentInput('${f.key}',this.value)">
-                <option value="">请选择...</option>
-                ${(f.options||[]).map(o=>`<option value="${o}"${agentInputs[f.key]===o?' selected':''}>${o}</option>`).join('')}
-               </select>`
-            : `<input class="agent-field-input" type="text" placeholder="${(f.placeholder||'').replace(/"/g,'&quot;')}" value="${(agentInputs[f.key]||'').replace(/"/g,'&quot;')}" oninput="setAgentInput('${f.key}',this.value)">`
-          }
-        `).join('')}
-        <button class="agent-run-btn" onclick="runAgent()" ${agentRunning?'disabled':''}>
-          ${agentRunning
-            ? `<span style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;"></span> 生成中...`
-            : `✨ 立即生成`}
-        </button>
-        ${agentErr ? `<div style="margin-top:12px;color:#EF4444;font-size:13px;text-align:center;">${agentErr}</div>` : ''}
-        ${agentResult ? `
-          <div style="margin-top:14px;">
-            <div style="font-size:13px;font-weight:600;color:#4A4035;margin-bottom:8px;">生成结果</div>
-            <div class="agent-result-box">${(typeof agentResult==='string'?agentResult:JSON.stringify(agentResult,null,2)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-            <button onclick="copyAgentResult()" style="margin-top:10px;width:100%;background:#F5F4F1;border:none;border-radius:10px;padding:11px 0;font-size:14px;font-weight:600;color:#4A4035;cursor:pointer;">📋 复制结果</button>
-          </div>
-        ` : ''}
-      </div>
-    </div>
-  ` : '';
-
   return `<div class="page-wrap agents-page">
     <div style="font-size:20px;font-weight:800;color:#1C1A16;margin-bottom:4px;">智能体大全</div>
     <div style="font-size:13px;color:#9C8E7A;margin-bottom:14px;">AI 驱动的专业创作工具</div>
     ${creditsHtml}
     <div class="agents-section-title">基础能力</div>
     ${cardsHtml}
-    ${detailHtml}
+  </div>`;
+}
+
+function tAgentDetailOverlay() {
+  const { selectedAgent, agentInputs, agentRunning, agentResult, agentErr, creditsBalance } = S;
+  if (!selectedAgent) return '';
+  return `<div class="agent-detail-overlay" onclick="if(event.target===this)closeAgentDetail()">
+    <div class="agent-detail-sheet">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="font-size:36px;line-height:1;">${selectedAgent.emoji || '🤖'}</div>
+          <div>
+            <div style="font-size:18px;font-weight:700;color:#1C1A16;">${selectedAgent.name}</div>
+            <div style="font-size:13px;color:#9C8E7A;margin-top:2px;">${selectedAgent.description}</div>
+          </div>
+        </div>
+        <div onclick="closeAgentDetail()" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#F5F4F1;cursor:pointer;flex-shrink:0;font-size:14px;color:#9C8E7A;">✕</div>
+      </div>
+      <div style="margin-bottom:16px;display:flex;align-items:center;gap:6px;">
+        <span style="font-size:13px;color:#9C8E7A;">消耗积分：</span>
+        <span style="font-size:14px;font-weight:700;color:#F97316;">⚡ ${selectedAgent.credits_cost} 分</span>
+        ${creditsBalance !== null ? `<span style="font-size:12px;color:#9C8E7A;margin-left:4px;">（余额 ${creditsBalance} 分）</span>` : ''}
+      </div>
+      ${(selectedAgent.input_fields || []).map(f => `
+        <div class="agent-field-label">${f.label}</div>
+        ${f.type === 'textarea'
+          ? `<textarea class="agent-field-input" rows="3" placeholder="${(f.placeholder||'').replace(/"/g,'&quot;')}" oninput="setAgentInput('${f.key}',this.value)">${agentInputs[f.key]||''}</textarea>`
+          : f.type === 'select'
+          ? `<select class="agent-field-select" onchange="setAgentInput('${f.key}',this.value)">
+              <option value="">请选择...</option>
+              ${(f.options||[]).map(o=>`<option value="${o}"${agentInputs[f.key]===o?' selected':''}>${o}</option>`).join('')}
+             </select>`
+          : `<input class="agent-field-input" type="text" placeholder="${(f.placeholder||'').replace(/"/g,'&quot;')}" value="${(agentInputs[f.key]||'').replace(/"/g,'&quot;')}" oninput="setAgentInput('${f.key}',this.value)">`
+        }
+      `).join('')}
+      <button class="agent-run-btn" onclick="runAgent()" ${agentRunning?'disabled':''}>
+        ${agentRunning
+          ? `<span style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;"></span> 生成中...`
+          : `✨ 立即生成`}
+      </button>
+      ${agentErr ? `<div style="margin-top:12px;color:#EF4444;font-size:13px;text-align:center;">${agentErr}</div>` : ''}
+      ${agentResult ? `
+        <div style="margin-top:14px;">
+          <div style="font-size:13px;font-weight:600;color:#4A4035;margin-bottom:8px;">生成结果</div>
+          <div class="agent-result-box">${(typeof agentResult==='string'?agentResult:JSON.stringify(agentResult,null,2)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          <button onclick="copyAgentResult()" style="margin-top:10px;width:100%;background:#F5F4F1;border:none;border-radius:10px;padding:11px 0;font-size:14px;font-weight:600;color:#4A4035;cursor:pointer;">📋 复制结果</button>
+        </div>
+      ` : ''}
+    </div>
   </div>`;
 }
 

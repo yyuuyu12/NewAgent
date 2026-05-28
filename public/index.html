@@ -1167,6 +1167,22 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 <body>
 <div id="app"></div>
 <script>
+// ===== DEBUG: 全局错误捕获（上线后可删） =====
+window.onerror = function(msg, url, line, col, err) {
+  document.title = 'ERR: ' + msg;
+  let d = document.getElementById('_dbg_err');
+  if (!d) { d = document.createElement('div'); d.id = '_dbg_err';
+    d.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#d00;color:#fff;padding:10px 14px;font-size:11px;z-index:99999;max-height:40vh;overflow:auto;font-family:monospace;';
+    document.body.appendChild(d); }
+  d.innerHTML += '<div>[L' + line + ':' + col + '] ' + msg + '</div>';
+};
+window.addEventListener('unhandledrejection', function(e) {
+  let d = document.getElementById('_dbg_err');
+  if (!d) { d = document.createElement('div'); d.id = '_dbg_err';
+    d.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#d00;color:#fff;padding:10px 14px;font-size:11px;z-index:99999;max-height:40vh;overflow:auto;font-family:monospace;';
+    document.body.appendChild(d); }
+  d.innerHTML += '<div>[Promise] ' + (e.reason?.message || e.reason || 'unknown') + '</div>';
+});
 // ===== CONFIG =====
 const API_BASE = (location.protocol === 'http:' || location.protocol === 'https:') ? `${location.origin}/api` : 'http://106.14.151.37/api';
 
@@ -1453,6 +1469,7 @@ function getViewKey() {
 }
 
 function setState(updates) {
+  console.log('[setState]', Object.keys(updates).join(','), updates.currentTab ? 'tab→'+updates.currentTab : '');
   const focusId = document.activeElement && document.activeElement.id;
   const focusSel = [document.activeElement && document.activeElement.selectionStart,
                     document.activeElement && document.activeElement.selectionEnd];
@@ -4269,6 +4286,7 @@ async function handleAuth() {
 
 // ===== NAV =====
 function switchTab(tab) {
+  console.log('[switchTab] from', S.currentTab, '→', tab);
   const resetProfile = tab !== 'profile';
   setState({
     prevTab: S.currentTab,
@@ -5209,6 +5227,7 @@ function resetCloneWorkspace(keepTaskId = true) {
 
 // 入口点击：生成中则继续，否则全新开始（清掉旧任务ID）
 async function openCloneEntry() {
+  console.log('[openCloneEntry] called');
   if (S.ttsGenerating || S.avatarGenerating || S.postProcessing) {
     switchTab('extract'); // 有任务跑着，直接进去看，不中断
     return;

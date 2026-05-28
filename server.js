@@ -15,12 +15,16 @@ const extractRouter  = require('./routes/extract');
 const rewriteRouter  = require('./routes/rewrite');
 const inspireRouter  = require('./routes/inspire');
 const historyRouter  = require('./routes/history');
+const { router: creditsRouter } = require('./routes/credits');
+const agentsRouter   = require('./routes/agents');
 
 app.use('/api/auth',    authRouter);
 app.use('/api/extract', extractRouter);
 app.use('/api/rewrite', rewriteRouter);
 app.use('/api/inspire', inspireRouter);
 app.use('/api/history', historyRouter);
+app.use('/api/credits', creditsRouter);
+app.use('/api/agents',  agentsRouter);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/health', (req, res) => res.json({ code: 200, msg: 'ok', time: new Date().toISOString() }));

@@ -1141,6 +1141,27 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 /* 语速滑块 */
 .speed-slider { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:3px; outline:none; cursor:pointer; }
 .speed-slider::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:#FF6B35; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.2); }
+/* 智能体 */
+.agents-page { padding: 16px; padding-bottom: 80px; }
+.agents-section-title { font-size: 12px; font-weight: 600; color: #9C8E7A; margin-bottom: 10px; margin-top: 4px; letter-spacing: 0.6px; text-transform: uppercase; }
+.agents-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.agent-card { background: #fff; border-radius: 14px; padding: 16px 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: transform 0.1s; }
+.agent-card:active { transform: scale(0.97); }
+.agent-emoji { font-size: 30px; line-height: 1; }
+.agent-name { font-size: 15px; font-weight: 700; color: #1C1A16; }
+.agent-desc { font-size: 12px; color: #9C8E7A; line-height: 1.4; }
+.agent-cost { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #F97316; font-weight: 600; margin-top: 4px; }
+.agent-detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: flex; align-items: flex-end; }
+.agent-detail-sheet { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-height: 88vh; overflow-y: auto; padding: 20px 16px 40px; }
+.agent-field-label { font-size: 13px; font-weight: 600; color: #4A4035; margin-bottom: 6px; margin-top: 14px; }
+.agent-field-input { width: 100%; box-sizing: border-box; border: 1.5px solid #ECEAE2; border-radius: 10px; padding: 10px 12px; font-size: 14px; color: #1C1A16; background: #FAF9F7; outline: none; resize: none; font-family: inherit; }
+.agent-field-input:focus { border-color: #FF6B35; }
+.agent-field-select { width: 100%; box-sizing: border-box; border: 1.5px solid #ECEAE2; border-radius: 10px; padding: 10px 12px; font-size: 14px; color: #1C1A16; background: #FAF9F7; outline: none; -webkit-appearance: none; appearance: none; font-family: inherit; }
+.agent-run-btn { margin-top: 20px; width: 100%; background: linear-gradient(135deg, #FF6B35, #F5762A); color: #fff; border: none; border-radius: 12px; padding: 14px 0; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.agent-run-btn:disabled { opacity: 0.6; }
+.agent-result-box { margin-top: 16px; background: #FAF9F7; border-radius: 12px; padding: 14px; font-size: 14px; color: #1C1A16; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+.agent-credits-badge { background: #FFF3E0; border-radius: 20px; padding: 6px 14px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #F97316; margin-bottom: 16px; }
+.agents-empty { text-align: center; padding: 40px 0; color: #9C8E7A; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -1272,6 +1293,10 @@ const S = {
   videoColorStyle: 'warm', videoSubtitle: true, videoMusic: false,
   // 步骤6：发布
   publishTitle: '', publishDesc: '', publishTags: [], publishTitleLoading: false, publishDescLoading: false, coverDownloaded: false, publishCopied: false,
+  // 智能体
+  agentsList: [], agentsLoading: false, agentsLoaded: false,
+  selectedAgent: null, agentInputs: {}, agentRunning: false, agentResult: null, agentErr: '',
+  creditsBalance: null,
 };
 let inspireController = null;
 let extractController = null;
@@ -1743,13 +1768,15 @@ function tTabContent() {
     case 'profile': return tProfile();
     case 'vip':     return tVip();
     case 'history': return tHistory();
+    case 'agents':  return tAgents();
     default:        return tHome();
   }
 }
 
 function tBottomTab() {
   const tabDef = [
-    { key: 'home',    label: '首页', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+    { key: 'home',    label: '爆款克隆', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>` },
+    { key: 'agents',  label: '智能体', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M9 11V7a3 3 0 016 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>` },
     { key: 'profile', label: '我的', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>` },
   ];
   return `<div class="bottom-tab">
@@ -4250,6 +4277,7 @@ function switchTab(tab) {
     loadTasks();
   }
   if (tab === 'extract' && !S.extractHistoryLoaded) loadExtractHistory();
+  if (tab === 'agents') loadAgents();
 }
 function goBack() {
   if (S.currentTab === 'history') {
@@ -7179,6 +7207,187 @@ async function confirmNickname() {
 
 function dismissNicknamePrompt() {
   setState({ nicknamePrompt: false, nicknamePromptDismissed: true });
+}
+
+// ===== 智能体 =====
+
+function tAgents() {
+  const { agentsList, agentsLoading, selectedAgent, agentInputs, agentRunning, agentResult, agentErr, creditsBalance } = S;
+
+  if (!getToken()) {
+    return `<div class="page-wrap" style="padding:60px 24px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:16px;">🤖</div>
+      <div style="font-size:18px;font-weight:700;color:#1C1A16;margin-bottom:8px;">智能体大全</div>
+      <div style="font-size:13px;color:#9C8E7A;margin-bottom:24px;">登录后解锁全部 AI 智能体</div>
+      <button class="btn-primary" style="width:100%;max-width:200px;" onclick="setState({showAuthSheet:true})">立即登录</button>
+    </div>`;
+  }
+
+  if (agentsLoading) {
+    return `<div class="page-wrap agents-page"><div class="agents-empty">加载中...</div></div>`;
+  }
+
+  const creditsHtml = creditsBalance !== null
+    ? `<div class="agent-credits-badge">⚡ 积分余额：${creditsBalance}</div>`
+    : '';
+
+  const cardsHtml = agentsList.length === 0
+    ? `<div class="agents-empty">暂无智能体，请稍后再来 🙏</div>`
+    : `<div class="agents-grid">
+        ${agentsList.map(a => `
+          <div class="agent-card" onclick="openAgentDetail(${a.id})">
+            <div class="agent-emoji">${a.emoji || '🤖'}</div>
+            <div class="agent-name">${a.name}</div>
+            <div class="agent-desc">${a.description}</div>
+            <div class="agent-cost">⚡ ${a.credits_cost} 积分</div>
+          </div>
+        `).join('')}
+      </div>`;
+
+  const detailHtml = selectedAgent ? `
+    <div class="agent-detail-overlay" onclick="if(event.target===this)closeAgentDetail()">
+      <div class="agent-detail-sheet">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="font-size:36px;line-height:1;">${selectedAgent.emoji || '🤖'}</div>
+            <div>
+              <div style="font-size:18px;font-weight:700;color:#1C1A16;">${selectedAgent.name}</div>
+              <div style="font-size:13px;color:#9C8E7A;margin-top:2px;">${selectedAgent.description}</div>
+            </div>
+          </div>
+          <div onclick="closeAgentDetail()" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#F5F4F1;cursor:pointer;flex-shrink:0;font-size:14px;color:#9C8E7A;">✕</div>
+        </div>
+        <div style="margin-bottom:16px;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:13px;color:#9C8E7A;">消耗积分：</span>
+          <span style="font-size:14px;font-weight:700;color:#F97316;">⚡ ${selectedAgent.credits_cost} 分</span>
+          ${creditsBalance !== null ? `<span style="font-size:12px;color:#9C8E7A;margin-left:4px;">（余额 ${creditsBalance} 分）</span>` : ''}
+        </div>
+        ${(selectedAgent.input_fields || []).map(f => `
+          <div class="agent-field-label">${f.label}</div>
+          ${f.type === 'textarea'
+            ? `<textarea class="agent-field-input" rows="3" placeholder="${(f.placeholder||'').replace(/"/g,'&quot;')}" oninput="setAgentInput('${f.key}',this.value)">${agentInputs[f.key]||''}</textarea>`
+            : f.type === 'select'
+            ? `<select class="agent-field-select" onchange="setAgentInput('${f.key}',this.value)">
+                <option value="">请选择...</option>
+                ${(f.options||[]).map(o=>`<option value="${o}"${agentInputs[f.key]===o?' selected':''}>${o}</option>`).join('')}
+               </select>`
+            : `<input class="agent-field-input" type="text" placeholder="${(f.placeholder||'').replace(/"/g,'&quot;')}" value="${(agentInputs[f.key]||'').replace(/"/g,'&quot;')}" oninput="setAgentInput('${f.key}',this.value)">`
+          }
+        `).join('')}
+        <button class="agent-run-btn" onclick="runAgent()" ${agentRunning?'disabled':''}>
+          ${agentRunning
+            ? `<span style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;"></span> 生成中...`
+            : `✨ 立即生成`}
+        </button>
+        ${agentErr ? `<div style="margin-top:12px;color:#EF4444;font-size:13px;text-align:center;">${agentErr}</div>` : ''}
+        ${agentResult ? `
+          <div style="margin-top:14px;">
+            <div style="font-size:13px;font-weight:600;color:#4A4035;margin-bottom:8px;">生成结果</div>
+            <div class="agent-result-box">${(typeof agentResult==='string'?agentResult:JSON.stringify(agentResult,null,2)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            <button onclick="copyAgentResult()" style="margin-top:10px;width:100%;background:#F5F4F1;border:none;border-radius:10px;padding:11px 0;font-size:14px;font-weight:600;color:#4A4035;cursor:pointer;">📋 复制结果</button>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  ` : '';
+
+  return `<div class="page-wrap agents-page">
+    <div style="font-size:20px;font-weight:800;color:#1C1A16;margin-bottom:4px;">智能体大全</div>
+    <div style="font-size:13px;color:#9C8E7A;margin-bottom:14px;">AI 驱动的专业创作工具</div>
+    ${creditsHtml}
+    <div class="agents-section-title">基础能力</div>
+    ${cardsHtml}
+    ${detailHtml}
+  </div>`;
+}
+
+async function loadAgents() {
+  if (S.agentsLoaded) {
+    try {
+      const r = await api.get('/credits/balance');
+      if (r.code === 200) setState({ creditsBalance: r.data.credits });
+    } catch {}
+    return;
+  }
+  setState({ agentsLoading: true });
+  try {
+    const [ar, cr] = await Promise.all([
+      api.get('/agents'),
+      api.get('/credits/balance').catch(() => null)
+    ]);
+    setState({
+      agentsList: ar.code === 200 ? (ar.data || []) : [],
+      agentsLoaded: true,
+      agentsLoading: false,
+      creditsBalance: cr && cr.code === 200 ? cr.data.credits : null
+    });
+  } catch {
+    setState({ agentsLoading: false });
+    showToast('加载失败，请重试');
+  }
+}
+
+function openAgentDetail(agentId) {
+  const agent = S.agentsList.find(a => a.id === agentId);
+  if (!agent) return;
+  setState({ selectedAgent: agent, agentInputs: {}, agentResult: null, agentErr: '', agentRunning: false });
+}
+
+function closeAgentDetail() {
+  setState({ selectedAgent: null, agentResult: null, agentErr: '', agentInputs: {}, agentRunning: false });
+}
+
+function setAgentInput(key, val) {
+  setState({ agentInputs: { ...S.agentInputs, [key]: val } });
+}
+
+async function runAgent() {
+  const { selectedAgent, agentInputs } = S;
+  if (!selectedAgent || S.agentRunning) return;
+  // 检查必填字段
+  for (const f of (selectedAgent.input_fields || [])) {
+    if (!agentInputs[f.key]?.trim()) {
+      setState({ agentErr: `请填写「${f.label}」` });
+      return;
+    }
+  }
+  setState({ agentRunning: true, agentErr: '', agentResult: null });
+  try {
+    const r = await api.post(`/agents/${selectedAgent.id}/run`, { inputs: agentInputs });
+    if (r.code !== 200) {
+      setState({ agentRunning: false, agentErr: r.msg || '调用失败，请重试' });
+      return;
+    }
+    let output = r.data.output;
+    if (typeof output === 'string') {
+      try {
+        const p = JSON.parse(output);
+        output = p.output || p.text || p.result || p.content || output;
+      } catch {}
+    }
+    setState({
+      agentRunning: false,
+      agentResult: output,
+      creditsBalance: r.data.credits_left
+    });
+  } catch (err) {
+    setState({ agentRunning: false, agentErr: '网络错误，请重试' });
+  }
+}
+
+function copyAgentResult() {
+  const { agentResult } = S;
+  if (!agentResult) return;
+  const text = typeof agentResult === 'string' ? agentResult : JSON.stringify(agentResult, null, 2);
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('已复制 ✓')).catch(() => {});
+  } else {
+    const el = document.createElement('textarea');
+    el.value = text; el.style.position = 'fixed'; el.style.opacity = '0';
+    document.body.appendChild(el); el.focus(); el.select();
+    document.execCommand('copy'); document.body.removeChild(el);
+    showToast('已复制 ✓');
+  }
 }
 
 // ===== INIT =====

@@ -1812,11 +1812,11 @@ function tHomeTaskSection() {
 
   // Helper: 6-step row with labels (设计稿统一样式)
   function stepsWithLabels(currentStep) {
-    const labels = ['提取','改写','语音','数字人','后期','发布'];
+    const labels = ['提取','改写'];
     const svgCheck = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     const svgDot = `<svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="#F5762A"/></svg>`;
-    let html = '<div style="display:flex;align-items:center;width:100%">';
-    for (let i = 0; i < 6; i++) {
+    let html = '<div style="display:flex;align-items:center;width:100%;max-width:200px">';
+    for (let i = 0; i < 2; i++) {
       const isDone = i + 1 < currentStep;
       const isActive = i + 1 === currentStep;
       const cirBg = isDone ? '#F5762A' : isActive ? 'rgba(245,118,42,0.12)' : '#F0EDE8';
@@ -1826,12 +1826,12 @@ function tHomeTaskSection() {
       const lblWeight = isActive ? '700' : '400';
       const inner = isDone ? svgCheck : isActive ? svgDot : (i + 1);
       html += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-        <div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${cirBg};color:${cirColor};border:${cirBorder};flex-shrink:0">${inner}</div>
-        <div style="font-size:9px;font-weight:${lblWeight};color:${lblColor};white-space:nowrap">${labels[i]}</div>
+        <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:${cirBg};color:${cirColor};border:${cirBorder};flex-shrink:0">${inner}</div>
+        <div style="font-size:11px;font-weight:${lblWeight};color:${lblColor};white-space:nowrap">${labels[i]}</div>
       </div>`;
-      if (i < 5) {
+      if (i < 1) {
         const lineColor = isDone ? '#F5762A' : '#F0EDE8';
-        html += `<div style="flex:1;height:1.5px;background:${lineColor};margin-bottom:14px"></div>`;
+        html += `<div style="flex:1;height:1.5px;background:${lineColor};margin-bottom:14px;min-width:60px"></div>`;
       }
     }
     html += '</div>';
@@ -1862,8 +1862,8 @@ function tHomeTaskSection() {
     const step = savedStep;
     return { step, phase: step >= 6 ? 'published' : 'step_done' };
   };
-  const cloneDoneLabels = ['提取中','提取完毕','改写完毕','语音完毕','数字人完毕','后期完毕'];
-  const cloneNextActions = ['查看提取进展 ›','查看改写结果 ›','查看语音结果 ›','查看语音结果 ›','查看数字人视频 ›','去发布 ›'];
+  const cloneDoneLabels = ['提取中','提取完毕','改写完毕'];
+  const cloneNextActions = ['查看提取进展 ›','查看改写结果 ›','查看改写结果 ›'];
   const cloneStatusText = t => {
     const info = clonePhaseOf(t);
     if (info.phase === 'failed') return '失败';
@@ -1968,7 +1968,7 @@ function tHomeTaskSection() {
   const _svgCheck = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
   const _svgActiveDot = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" fill="#F5762A"/></svg>`;
   function _hlcSteps(activeStep) {
-    const labels = ['提取','改写','语音','数字人','后期','发布'];
+    const labels = ['提取','改写'];
     let html = '';
     for (let i = 0; i < labels.length; i++) {
       const cls = i < activeStep ? 'sdone' : i === activeStep ? 'sactive' : 'sinactive';
@@ -2227,7 +2227,7 @@ function cloneCurrentStep() {
 function tCloneStepBar() {
   const cur = cloneCurrentStep();
   if (cur === 0) return '';
-  const steps = ['提取','改写','语音','数字人','后期','发布'];
+  const steps = ['提取','改写'];
   const CHECK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
   let parts = [];
   steps.forEach((label, i) => {
@@ -2237,7 +2237,7 @@ function tCloneStepBar() {
     const lc = done ? 'csb-lbl csb-lbl-done' : (active ? 'csb-lbl csb-lbl-active' : 'csb-lbl csb-lbl-idle');
     const inner = done ? CHECK : n;
     parts.push(`<div class="csb-step"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
-    if (n < 6) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
+    if (n < 2) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
   });
   return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
 }
@@ -6667,11 +6667,11 @@ function tHistory() {
   const statusTextH = t => taskKindLabel(t);
   const openTaskActionH = t => (t.type === 'clone_video' && t.status !== 'failed') ? `openExtractWithTask('${t.id}')` : `openTaskFromHome('${t.id}')`;
   const stepsWithLabelsH = currentStep => {
-    const labels = ['提取','改写','语音','数字人','后期','发布'];
+    const labels = ['提取','改写'];
     const svgCheck = `<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     const svgDot = `<svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="#F5762A"/></svg>`;
-    let html = '<div style="display:flex;align-items:center;width:100%">';
-    for (let i = 0; i < 6; i++) {
+    let html = '<div style="display:flex;align-items:center;width:100%;max-width:200px">';
+    for (let i = 0; i < 2; i++) {
       const isDone = i + 1 < currentStep;
       const isActive = i + 1 === currentStep;
       const cirBg = isDone ? '#F5762A' : isActive ? 'rgba(245,118,42,0.12)' : '#F0EDE8';
@@ -6681,12 +6681,12 @@ function tHistory() {
       const lblWeight = isActive ? '700' : '400';
       const inner = isDone ? svgCheck : isActive ? svgDot : (i + 1);
       html += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-        <div style="width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${cirBg};color:${cirColor};border:${cirBorder};flex-shrink:0">${inner}</div>
-        <div style="font-size:9px;font-weight:${lblWeight};color:${lblColor};white-space:nowrap">${labels[i]}</div>
+        <div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:${cirBg};color:${cirColor};border:${cirBorder};flex-shrink:0">${inner}</div>
+        <div style="font-size:11px;font-weight:${lblWeight};color:${lblColor};white-space:nowrap">${labels[i]}</div>
       </div>`;
-      if (i < 5) {
+      if (i < 1) {
         const lineColor = isDone ? '#F5762A' : '#F0EDE8';
-        html += `<div style="flex:1;height:1.5px;background:${lineColor};margin-bottom:14px"></div>`;
+        html += `<div style="flex:1;height:1.5px;background:${lineColor};margin-bottom:14px;min-width:60px"></div>`;
       }
     }
     html += '</div>';

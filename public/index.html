@@ -1469,7 +1469,6 @@ function getViewKey() {
 }
 
 function setState(updates) {
-  console.log('[setState]', Object.keys(updates).join(','), updates.currentTab ? 'tab→'+updates.currentTab : '');
   const focusId = document.activeElement && document.activeElement.id;
   const focusSel = [document.activeElement && document.activeElement.selectionStart,
                     document.activeElement && document.activeElement.selectionEnd];
@@ -1488,17 +1487,7 @@ function render() {
   // 保存 blob video 节点，渲染后复用，避免视频闪烁
   const oldVideo = document.querySelector('#app video[src^="blob:"]');
   const oldVideoSrc = oldVideo ? oldVideo.src : null;
-  let _html;
-  try { _html = tMain(); } catch(e) {
-    console.error('[render error]', e);
-    document.getElementById('app').innerHTML = `<div style="padding:60px 24px;text-align:center;">
-      <div style="font-size:15px;font-weight:600;color:#EF4444;margin-bottom:8px;">页面渲染异常</div>
-      <div style="font-size:12px;color:#9C8E7A;margin-bottom:4px;word-break:break-all">${e.message||e}</div>
-      <div style="margin-top:20px;background:#FF6B35;color:#fff;border-radius:10px;padding:12px 24px;cursor:pointer;display:inline-block;" onclick="location.reload()">刷新重试</div>
-    </div>`;
-    return;
-  }
-  document.getElementById('app').innerHTML = _html;
+  document.getElementById('app').innerHTML = tMain();
   _lastRenderedViewKey = newViewKey;
   if (oldVideoSrc) {
     const newVideo = document.querySelector('#app video');
@@ -4286,7 +4275,6 @@ async function handleAuth() {
 
 // ===== NAV =====
 function switchTab(tab) {
-  console.log('[switchTab] from', S.currentTab, '→', tab);
   const resetProfile = tab !== 'profile';
   setState({
     prevTab: S.currentTab,
@@ -5227,7 +5215,6 @@ function resetCloneWorkspace(keepTaskId = true) {
 
 // 入口点击：生成中则继续，否则全新开始（清掉旧任务ID）
 async function openCloneEntry() {
-  console.log('[openCloneEntry] called');
   if (S.ttsGenerating || S.avatarGenerating || S.postProcessing) {
     switchTab('extract'); // 有任务跑着，直接进去看，不中断
     return;
@@ -7268,9 +7255,9 @@ function tAgents() {
     : `<div class="agents-grid">
         ${agentsList.map(a => `
           <div class="agent-card" onclick="openAgentDetail(${a.id})">
-            <div class="agent-emoji">${a.emoji || '🤖'}</div>
-            <div class="agent-name">${a.name}</div>
-            <div class="agent-desc">${a.description}</div>
+            <div class="agent-emoji">${esc(a.emoji || '🤖')}</div>
+            <div class="agent-name">${esc(a.name)}</div>
+            <div class="agent-desc">${esc(a.description)}</div>
             <div class="agent-cost">⚡ ${a.credits_cost} 积分</div>
           </div>
         `).join('')}
@@ -7292,10 +7279,10 @@ function tAgentDetailOverlay() {
     <div class="agent-detail-sheet">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="font-size:36px;line-height:1;">${selectedAgent.emoji || '🤖'}</div>
+          <div style="font-size:36px;line-height:1;">${esc(selectedAgent.emoji || '🤖')}</div>
           <div>
-            <div style="font-size:18px;font-weight:700;color:#1C1A16;">${selectedAgent.name}</div>
-            <div style="font-size:13px;color:#9C8E7A;margin-top:2px;">${selectedAgent.description}</div>
+            <div style="font-size:18px;font-weight:700;color:#1C1A16;">${esc(selectedAgent.name)}</div>
+            <div style="font-size:13px;color:#9C8E7A;margin-top:2px;">${esc(selectedAgent.description)}</div>
           </div>
         </div>
         <div onclick="closeAgentDetail()" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#F5F4F1;cursor:pointer;flex-shrink:0;font-size:14px;color:#9C8E7A;">✕</div>
@@ -7306,7 +7293,7 @@ function tAgentDetailOverlay() {
         ${creditsBalance !== null ? `<span style="font-size:12px;color:#9C8E7A;margin-left:4px;">（余额 ${creditsBalance} 分）</span>` : ''}
       </div>
       ${(selectedAgent.input_fields || []).map(f => `
-        <div class="agent-field-label">${f.label}</div>
+        <div class="agent-field-label">${esc(f.label)}</div>
         ${f.type === 'textarea'
           ? `<textarea class="agent-field-input" rows="3" placeholder="${(f.placeholder||'').replace(/"/g,'&quot;')}" oninput="setAgentInput('${f.key}',this.value)">${agentInputs[f.key]||''}</textarea>`
           : f.type === 'select'
@@ -7322,11 +7309,11 @@ function tAgentDetailOverlay() {
           ? `<span style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;"></span> 生成中...`
           : `✨ 立即生成`}
       </button>
-      ${agentErr ? `<div style="margin-top:12px;color:#EF4444;font-size:13px;text-align:center;">${agentErr}</div>` : ''}
+      ${agentErr ? `<div style="margin-top:12px;color:#EF4444;font-size:13px;text-align:center;">${esc(agentErr)}</div>` : ''}
       ${agentResult ? `
         <div style="margin-top:14px;">
           <div style="font-size:13px;font-weight:600;color:#4A4035;margin-bottom:8px;">生成结果</div>
-          <div class="agent-result-box">${(typeof agentResult==='string'?agentResult:JSON.stringify(agentResult,null,2)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          <div class="agent-result-box">${esc(typeof agentResult==='string'?agentResult:JSON.stringify(agentResult,null,2))}</div>
           <button onclick="copyAgentResult()" style="margin-top:10px;width:100%;background:#F5F4F1;border:none;border-radius:10px;padding:11px 0;font-size:14px;font-weight:600;color:#4A4035;cursor:pointer;">📋 复制结果</button>
         </div>
       ` : ''}

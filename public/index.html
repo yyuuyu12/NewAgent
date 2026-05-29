@@ -4341,7 +4341,7 @@ async function fetchMe() {
 async function loadIndustries() {
   try {
     const r = await api.get('/config/industries');
-    if (r.code === 200) { S.industries = r.data || []; render(); }
+    if (r.code === 200 && Array.isArray(r.data)) { S.industries = r.data; render(); }
   } catch {}
 }
 
@@ -4718,7 +4718,7 @@ function saveMyVoices(arr) {
 async function loadMyVoices() {
   try {
     const r = await api.get('/ai/voices');
-    if (r.code === 200) setState({ myVoices: r.data || [] });
+    if (r.code === 200 && Array.isArray(r.data)) setState({ myVoices: r.data });
   } catch(e) { console.warn('loadMyVoices:', e.message); }
 }
 
@@ -6559,7 +6559,7 @@ async function loadRecentHistory() {
   try {
     const r = await api.get('/history?type=inspire');
     if (apiUnauthorized(r)) { S.recentHistory = []; S.recentHistoryLoaded = true; render(); return; }
-    if (r.code === 200) { S.recentHistory = r.data || []; S.recentHistoryLoaded = true; render(); }
+    if (r.code === 200) { S.recentHistory = Array.isArray(r.data) ? r.data : (r.data?.list || []); S.recentHistoryLoaded = true; render(); }
   } catch {}
 }
 
@@ -6568,7 +6568,7 @@ async function loadHomeHistory() {
   try {
     const r = await api.get('/history');
     if (apiUnauthorized(r)) { S.homeHistory = []; S.homeHistoryLoaded = true; render(); return; }
-    if (r.code === 200) { S.homeHistory = r.data || []; S.homeHistoryLoaded = true; render(); }
+    if (r.code === 200) { S.homeHistory = Array.isArray(r.data) ? r.data : (r.data?.list || []); S.homeHistoryLoaded = true; render(); }
   } catch {}
 }
 
@@ -6582,7 +6582,7 @@ async function loadExtractHistory() {
   try {
     const r = await api.get('/history?type=extract');
     if (apiUnauthorized(r)) { S.extractHistory = []; S.extractHistoryLoaded = true; render(); return; }
-    if (r.code === 200) { S.extractHistory = r.data || []; S.extractHistoryLoaded = true; render(); }
+    if (r.code === 200) { S.extractHistory = Array.isArray(r.data) ? r.data : (r.data?.list || []); S.extractHistoryLoaded = true; render(); }
   } catch {}
 }
 
@@ -6596,7 +6596,7 @@ async function loadCloneHistory() {
   try {
     const r = await api.get('/history?type=rewrite');
     if (apiUnauthorized(r)) { S.cloneHistory = []; S.cloneHistoryLoaded = true; render(); return; }
-    if (r.code === 200) { S.cloneHistory = r.data || []; S.cloneHistoryLoaded = true; render(); }
+    if (r.code === 200) { S.cloneHistory = Array.isArray(r.data) ? r.data : (r.data?.list || []); S.cloneHistoryLoaded = true; render(); }
   } catch {}
 }
 
@@ -6977,8 +6977,9 @@ async function loadTasks() {
   try {
     const r = await api.get('/tasks');
     if (r.code === 200) {
-      const tasks = mergeActiveCloneTaskStep(r.data);
-      setState({ tasksList: tasks, tasksLoaded: true });
+      const rawData = Array.isArray(r.data) ? r.data : (r.data?.list || []);
+      const tasks = mergeActiveCloneTaskStep(rawData);
+      setState({ tasksList: tasks || [], tasksLoaded: true });
       updateHomeDoneSeen();
       const hasRunning = tasks.some(t => t.status === 'pending' || t.status === 'running');
       if (hasRunning) { startTasksPolling(); startTasksTickTimer(); }
@@ -6994,7 +6995,8 @@ function startTasksPolling() {
     try {
       const r = await api.get('/tasks');
       if (r.code === 200) {
-        const tasks = mergeActiveCloneTaskStep(r.data);
+        const rawData = Array.isArray(r.data) ? r.data : (r.data?.list || []);
+        const tasks = mergeActiveCloneTaskStep(rawData) || [];
         // 用 JSON 摘要判断数据是否真的变化，没变化就不触发 render，避免手机滚动时被打断
         const newJson = JSON.stringify(tasks.map(t => `${t.id}:${t.status}:${t.stage}:${t.clone_step}:${t.progress}:${t.error_msg||''}`));
         const changed = newJson !== _lastTasksJson;

@@ -1,5 +1,20 @@
 const db = require('./db');
 
+// 幂等补字段：列不存在时才 ADD，避免每次启动报错
+async function ensureColumn(table, column, definition) {
+  try {
+    const { rows } = await db.query(
+      'SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+      [table, column]
+    );
+    if (rows && rows[0] && parseInt(rows[0].c) > 0) return;
+    await db.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+    console.log(`[DB] 已补字段 ${table}.${column}`);
+  } catch (err) {
+    console.warn(`[DB] 补字段 ${table}.${column} 失败:`, err.message);
+  }
+}
+
 module.exports = async function initDb() {
   // 复用主库的 users / sms_codes / system_config / usage_logs / industry_videos 表
 
@@ -52,6 +67,22 @@ module.exports = async function initDb() {
       used_at        DATETIME DEFAULT NULL,
       created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_code (code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // ── 补字段：激活码类型（credits=积分码 / premium=进阶解锁码）+ 进阶天数（0=永久全开）──
+  await ensureColumn('cw_activation_codes', 'type', "VARCHAR(20) NOT NULL DEFAULT 'credits'");
+  await ensureColumn('cw_activation_codes', 'premium_days', 'INT NOT NULL DEFAULT 0');
+
+  // ── 用户进阶（口播工坊）权限 ──────────────────────────────────────────────
+  // premium_until 为 NULL=未开通；远期日期=已开通（永久全开写入 2099 年）
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_user_premium (
+      user_id       INT NOT NULL UNIQUE,
+      premium_until DATETIME DEFAULT NULL,
+      granted_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 

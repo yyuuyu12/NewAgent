@@ -4630,16 +4630,21 @@ async function handleExtract() {
   if (!S.videoUrl.trim() || S.extractLoading) return;
   setState({ extractLoading: true, extractErr: '' });
   try {
-    // 已有任务（清空内容后重新提交）→ 复用原任务ID，不新建
-    const r = S.cloneTaskId
-      ? await api.post('/video/clone-restart', { url: S.videoUrl.trim(), taskId: S.cloneTaskId })
-      : await api.post('/video/clone-start', { url: S.videoUrl.trim() });
+    // 同步提取：后端直接返回文案，无需任务轮询
+    const r = await api.post('/extract/video', { url: S.videoUrl.trim() });
     if (apiUnauthorized(r)) { setState({ extractLoading: false }); return; }
     if (r.code === 200) {
-      setState({ extractLoading: false, cloneTaskId: r.data.taskId, cloneTaskData: null, extractStep: 'cloning' });
-      startClonePoller(r.data.taskId);
+      const script = (r.data?.script || '').trim();
+      setState({
+        extractLoading: false,
+        cloneTaskId: null,
+        cloneTaskData: null,
+        extractStep: 'review',
+        extractedScript: script,
+        extractErr: script ? '' : '未能提取到文案，请检查链接或直接手动粘贴文案'
+      });
     } else {
-      setState({ extractErr: r.msg || '提交失败，请重试', extractLoading: false });
+      setState({ extractErr: r.msg || '提取失败，请重试', extractLoading: false });
     }
   } catch {
     setState({ extractErr: '网络错误，请重试', extractLoading: false });
@@ -4689,47 +4694,22 @@ async function handleCloneRewrite() {
   const text = S.extractedScript.trim();
   if (!text) { showToast('请先填写原始文案'); return; }
 
+  if (text.length < 10) { showToast('文案内容太短，请输入更完整的文案'); return; }
+
   const wasRewriteStep = S.extractStep === 2;
-  // 清空旧 cloneTaskData 的 progress/thinking，避免重写进度条闪烁满格（旧 done 状态 progress=100）
-  const resetTaskData = S.cloneTaskData ? { ...S.cloneTaskData, progress: 0, thinking: '' } : null;
-  setState({ extractStep: 'rewriting', rewriteSourceExpanded: false, extractErr: '', cloneTaskData: resetTaskData });
-  saveCloneSession(2);
-  if (S.cloneTaskId) {
-    try {
-      const r = await api.post(`/tasks/${S.cloneTaskId}/start-rewrite`, { editedTranscript: text });
-      if (apiUnauthorized(r)) return;
-      if (r.code !== 200) {
-        setState({ extractStep: wasRewriteStep ? 2 : 'review', extractErr: r.msg || '改写失败，请重试' });
-        return;
-      }
-      const nowIso = new Date().toISOString();
-      S.tasksList = (S.tasksList || []).map(t => String(t.id) === String(S.cloneTaskId)
-        ? { ...t, status: 'pending', stage: 'extracted', progress: 50, clone_step: 2, activity_at: nowIso, updated_at: nowIso }
-        : t);
-      startClonePoller(S.cloneTaskId);
-      loadTasks();
-      return;
-    } catch (e) {
-      setState({ extractStep: wasRewriteStep ? 2 : 'review', extractErr: '网络错误，请重试' });
-      return;
-    }
-  }
+  setState({ extractStep: 'rewriting', rewriteSourceExpanded: false, extractErr: '' });
   try {
-    // 直接把用户编辑好的文案传给 AI 改写，不经过 task 队列
-    const r = await api.post('/ai/rewrite', { text });
+    // 同步改写：后端返回多个改写版本，取第一版作为结果
+    const r = await api.post('/rewrite/generate', { text, source_type: 'douyin' });
+    if (apiUnauthorized(r)) { setState({ extractStep: wasRewriteStep ? 2 : 'review' }); return; }
     if (r.code === 200) {
-      const rewritten = (r.data?.result || '').trim();
+      const versions = Array.isArray(r.data?.versions) ? r.data.versions : [];
+      const rewritten = (versions[0] || '').trim();
       if (!rewritten) {
-        setState({ extractStep: 2, rewrittenScript: '', rewriteSourceExpanded: false, extractErr: 'AI改写结果为空，请点击重新改写' });
+        setState({ extractStep: 'review', extractErr: 'AI改写结果为空，请点击重新改写' });
         return;
       }
       setState({ extractStep: 2, rewrittenScript: rewritten, rewriteSourceExpanded: false, extractErr: '' });
-      // 把任务状态更新为 done，并保存 session（step=2），首页进度条才能更新
-      if (S.cloneTaskId) {
-        api.post(`/tasks/${S.cloneTaskId}/set-rewritten`, { rewrittenScript: rewritten }).catch(() => {});
-        saveCloneSession(2);
-        loadTasks(); // 刷新首页任务列表
-      }
     } else {
       setState({ extractStep: wasRewriteStep ? 2 : 'review', extractErr: r.msg || '改写失败，请重试' });
     }

@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 · 爆款文案工坊</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel-2:#1d212b; --line:#272c38;
+    --txt:#e7eaf0; --txt-2:#9aa3b2; --txt-3:#6b7280;
+    --accent:#5b8cff; --accent-2:#3b6fe0;
+    --gold:#d8a657; --green:#3fb950; --red:#f85149; --amber:#d29922;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select{font-family:inherit;font-size:14px}
+  a{color:var(--accent);text-decoration:none}
+  .muted{color:var(--txt-2)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+  /* ── 登录 ── */
+  #login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-card{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px 28px}
+  .login-card h1{font-size:18px;font-weight:600;margin-bottom:4px}
+  .login-card .sub{color:var(--txt-3);font-size:13px;margin-bottom:24px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--txt-2);margin-bottom:6px}
+  .field input{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:9px;color:var(--txt);outline:none;transition:border-color .15s}
+  .field input:focus{border-color:var(--accent)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 16px;border-radius:9px;font-size:14px;font-weight:500;transition:background .15s,opacity .15s}
+  .btn-primary{background:var(--accent);color:#fff;width:100%}
+  .btn-primary:hover{background:var(--accent-2)}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+  .btn-ghost{background:var(--panel-2);color:var(--txt);border:1px solid var(--line)}
+  .btn-ghost:hover{background:var(--line)}
+  .btn-sm{padding:6px 12px;font-size:13px}
+  .btn-danger{color:var(--red);background:transparent;border:1px solid var(--line)}
+  .btn-danger:hover{background:rgba(248,81,73,.1);border-color:var(--red)}
+  .err{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
+
+  /* ── 布局 ── */
+  #app{display:none;min-height:100vh}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;border-bottom:1px solid var(--line);background:var(--panel);position:sticky;top:0;z-index:10}
+  .topbar .brand{font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px}
+  .topbar .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+  .topbar .right{display:flex;align-items:center;gap:14px;color:var(--txt-2);font-size:13px}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  .tabs{display:flex;gap:4px;margin-bottom:22px;border-bottom:1px solid var(--line)}
+  .tabs button{padding:10px 16px;font-size:14px;color:var(--txt-2);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tabs button.on{color:var(--txt);border-bottom-color:var(--accent);font-weight:500}
+
+  /* ── 概览卡片 ── */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .stat .k{font-size:12px;color:var(--txt-2);margin-bottom:8px}
+  .stat .v{font-size:26px;font-weight:600;letter-spacing:-.5px}
+  .stat .v small{font-size:13px;font-weight:400;color:var(--txt-3);margin-left:4px}
+
+  /* ── 面板 ── */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+  .panel h3{font-size:14px;font-weight:600;margin-bottom:14px}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl label{font-size:12px;color:var(--txt-2)}
+  .ctl input,.ctl select{padding:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt);outline:none;min-width:120px}
+  .ctl input:focus,.ctl select:focus{border-color:var(--accent)}
+
+  /* ── 表格 ── */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{color:var(--txt-2);font-weight:500;font-size:12px;background:var(--panel-2)}
+  tbody tr:hover{background:var(--panel-2)}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;border:1px solid transparent}
+  .pill.credits{color:var(--accent);background:rgba(91,140,255,.12)}
+  .pill.premium{color:var(--gold);background:rgba(216,166,87,.12)}
+  .pill.used{color:var(--txt-3);background:var(--panel-2);border-color:var(--line)}
+  .pill.unused{color:var(--green);background:rgba(63,185,80,.12)}
+  .pill.on{color:var(--gold);background:rgba(216,166,87,.12)}
+  .pill.off{color:var(--txt-3);background:var(--panel-2);border-color:var(--line)}
+  .codecell{font-family:ui-monospace,Consolas,monospace;letter-spacing:.5px}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+  .empty{text-align:center;color:var(--txt-3);padding:40px 0;font-size:13px}
+  .toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);background:#222732;border:1px solid var(--line);color:var(--txt);padding:10px 18px;border-radius:10px;font-size:13px;z-index:100;box-shadow:0 8px 30px rgba(0,0,0,.4);opacity:0;transition:opacity .2s,transform .2s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.err{border-color:var(--red);color:#ffb4ae}
+  .toast.ok{border-color:var(--green)}
+
+  /* 生成结果码列表 */
+  .codes-out{margin-top:14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:12px;max-height:200px;overflow:auto}
+  .codes-out .line{font-family:ui-monospace,Consolas,monospace;font-size:13px;padding:3px 0;letter-spacing:.5px;color:var(--txt)}
+  .spin{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;display:inline-block;vertical-align:middle}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<!-- ── 登录 ── -->
+<div id="login">
+  <div class="login-card">
+    <h1>管理后台</h1>
+    <div class="sub">爆款文案工坊 · 仅限管理员</div>
+    <div class="field">
+      <label>账号（手机号）</label>
+      <input id="lg-phone" type="text" autocomplete="username" placeholder="管理员账号">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input id="lg-pass" type="password" autocomplete="current-password" placeholder="密码">
+    </div>
+    <button id="lg-btn" class="btn btn-primary" onclick="doLogin()">登 录</button>
+    <div id="lg-err" class="err"></div>
+  </div>
+</div>
+
+<!-- ── 主界面 ── -->
+<div id="app">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>爆款文案工坊 · 管理后台</div>
+    <div class="right">
+      <span id="who" class="muted"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">退出登录</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="tabs">
+      <button id="tab-overview" class="on" onclick="switchTab('overview')">概览</button>
+      <button id="tab-codes" onclick="switchTab('codes')">激活码</button>
+      <button id="tab-users" onclick="switchTab('users')">用户</button>
+    </div>
+    <div id="view"></div>
+  </div>
+</div>
+
+<script>
+const API = '/api/admin';
+let TOKEN = localStorage.getItem('admin_token') || '';
+let curTab = 'overview';
+let codesCache = [];
+let usersCache = [];
+
+// ── 请求封装 ──
+async function req(method, path, body) {
+  const opt = { method, headers: { 'Content-Type': 'application/json' } };
+  if (TOKEN) opt.headers['Authorization'] = 'Bearer ' + TOKEN;
+  if (body) opt.body = JSON.stringify(body);
+  const r = await fetch(API + path, opt);
+  let j = {};
+  try { j = await r.json(); } catch {}
+  if (r.status === 401 || r.status === 403) {
+    if (path !== '/login') { logout(); throw new Error(j.msg || '登录已失效'); }
+  }
+  return j;
+}
+
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => { t.className = 'toast'; }, 2600);
+}
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtTime(t){ if(!t) return '—'; const d=new Date(t); if(isNaN(d)) return '—'; const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function fmtDate(t){ if(!t) return '—'; const d=new Date(t); if(isNaN(d)) return '—'; const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`; }
+
+// ── 登录 ──
+async function doLogin() {
+  const phone = document.getElementById('lg-phone').value.trim();
+  const password = document.getElementById('lg-pass').value;
+  const errEl = document.getElementById('lg-err');
+  const btn = document.getElementById('lg-btn');
+  errEl.textContent = '';
+  if (!phone || !password) { errEl.textContent = '请输入账号和密码'; return; }
+  btn.disabled = true; btn.textContent = '登录中…';
+  try {
+    const r = await req('POST', '/login', { phone, password });
+    if (r.code === 200 && r.data && r.data.token) {
+      TOKEN = r.data.token;
+      localStorage.setItem('admin_token', TOKEN);
+      localStorage.setItem('admin_name', r.data.nickname || '管理员');
+      enterApp();
+    } else {
+      errEl.textContent = r.msg || '登录失败';
+    }
+  } catch (e) {
+    errEl.textContent = e.message || '网络错误';
+  } finally {
+    btn.disabled = false; btn.textContent = '登 录';
+  }
+}
+
+function logout() {
+  TOKEN = '';
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_name');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login').style.display = 'flex';
+}
+
+function enterApp() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('who').textContent = localStorage.getItem('admin_name') || '管理员';
+  switchTab('overview');
+}
+
+function switchTab(tab) {
+  curTab = tab;
+  ['overview','codes','users'].forEach(t => {
+    document.getElementById('tab-'+t).className = (t===tab) ? 'on' : '';
+  });
+  if (tab === 'overview') renderOverview();
+  else if (tab === 'codes') renderCodes();
+  else if (tab === 'users') renderUsers();
+}
+
+// ── 概览 ──
+async function renderOverview() {
+  const v = document.getElementById('view');
+  v.innerHTML = '<div class="empty"><span class="spin"></span></div>';
+  try {
+    const r = await req('GET', '/stats');
+    const d = (r.code===200 && r.data) ? r.data : {};
+    v.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat"><div class="k">总用户数</div><div class="v">${d.users||0}</div></div>
+        <div class="stat"><div class="k">进阶版用户</div><div class="v">${d.premiumUsers||0}</div></div>
+        <div class="stat"><div class="k">激活码总数</div><div class="v">${d.codesTotal||0}</div></div>
+        <div class="stat"><div class="k">已使用</div><div class="v">${d.codesUsed||0}</div></div>
+        <div class="stat"><div class="k">未使用</div><div class="v">${d.codesUnused||0}</div></div>
+        <div class="stat"><div class="k">进阶解锁码</div><div class="v">${d.codesPremium||0}</div></div>
+        <div class="stat"><div class="k">累计发放积分</div><div class="v">${d.creditsIssued||0}</div></div>
+      </div>`;
+  } catch (e) {
+    v.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+// ── 激活码 ──
+function renderCodes() {
+  const v = document.getElementById('view');
+  v.innerHTML = `
+    <div class="panel">
+      <h3>生成激活码</h3>
+      <div class="row">
+        <div class="ctl">
+          <label>类型</label>
+          <select id="g-type" onchange="onTypeChange()">
+            <option value="credits">积分码</option>
+            <option value="premium">进阶解锁码</option>
+          </select>
+        </div>
+        <div class="ctl">
+          <label>数量（≤100）</label>
+          <input id="g-count" type="number" value="10" min="1" max="100">
+        </div>
+        <div class="ctl" id="ctl-credits">
+          <label>发放积分</label>
+          <input id="g-credits" type="number" value="100" min="0">
+        </div>
+        <div class="ctl" id="ctl-days" style="display:none">
+          <label>进阶天数（0=永久）</label>
+          <input id="g-days" type="number" value="0" min="0">
+        </div>
+        <div class="ctl">
+          <label>前缀（可选）</label>
+          <input id="g-prefix" type="text" maxlength="8" placeholder="如 VIP">
+        </div>
+        <button id="g-btn" class="btn btn-primary" style="width:auto" onclick="genCodes()">生成</button>
+      </div>
+      <div id="g-out"></div>
+    </div>
+
+    <div class="panel">
+      <div class="toolbar">
+        <h3 style="margin:0">激活码列表</h3>
+        <div class="row" style="align-items:center">
+          <select id="f-status" class="ctl" style="padding:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt)" onchange="loadCodes()">
+            <option value="all">全部状态</option>
+            <option value="unused">未使用</option>
+            <option value="used">已使用</option>
+          </select>
+          <select id="f-type" style="padding:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt)" onchange="loadCodes()">
+            <option value="all">全部类型</option>
+            <option value="credits">积分码</option>
+            <option value="premium">进阶码</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadCodes()">刷新</button>
+        </div>
+      </div>
+      <div id="codes-table"><div class="empty"><span class="spin"></span></div></div>
+    </div>`;
+  loadCodes();
+}
+
+function onTypeChange() {
+  const t = document.getElementById('g-type').value;
+  document.getElementById('ctl-credits').style.display = (t==='premium') ? 'none' : '';
+  document.getElementById('ctl-days').style.display = (t==='premium') ? '' : 'none';
+}
+
+async function genCodes() {
+  const type = document.getElementById('g-type').value;
+  const count = parseInt(document.getElementById('g-count').value) || 1;
+  const credits_amount = parseInt(document.getElementById('g-credits').value) || 0;
+  const premium_days = parseInt(document.getElementById('g-days').value) || 0;
+  const prefix = document.getElementById('g-prefix').value.trim();
+  const btn = document.getElementById('g-btn');
+  if (type === 'credits' && credits_amount <= 0) { toast('积分码必须设置发放积分（>0）','err'); return; }
+  btn.disabled = true; btn.textContent = '生成中…';
+  try {
+    const r = await req('POST', '/codes', { type, count, credits_amount, premium_days, prefix });
+    if (r.code === 200) {
+      const codes = (r.data && r.data.codes) || [];
+      toast(r.msg || `已生成 ${codes.length} 个`, 'ok');
+      const out = document.getElementById('g-out');
+      out.innerHTML = codes.length
+        ? `<div class="codes-out">${codes.map(c=>`<div class="line">${esc(c)}</div>`).join('')}</div>
+           <button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="copyCodes(${JSON.stringify(codes).replace(/"/g,'&quot;')})">复制全部</button>`
+        : '';
+      loadCodes();
+    } else {
+      toast(r.msg || '生成失败', 'err');
+    }
+  } catch (e) {
+    toast(e.message || '网络错误', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '生成';
+  }
+}
+
+function copyCodes(codes) {
+  const txt = codes.join('\n');
+  navigator.clipboard.writeText(txt).then(()=>toast('已复制到剪贴板','ok')).catch(()=>toast('复制失败','err'));
+}
+
+async function loadCodes() {
+  const status = document.getElementById('f-status') ? document.getElementById('f-status').value : 'all';
+  const type = document.getElementById('f-type') ? document.getElementById('f-type').value : 'all';
+  const box = document.getElementById('codes-table');
+  if (!box) return;
+  box.innerHTML = '<div class="empty"><span class="spin"></span></div>';
+  try {
+    const r = await req('GET', `/codes?status=${status}&type=${type}&limit=300`);
+    const rows = (r.code===200 && r.data) ? r.data : [];
+    codesCache = rows;
+    if (!rows.length) { box.innerHTML = '<div class="empty">暂无数据</div>'; return; }
+    box.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>激活码</th><th>类型</th><th>积分</th><th>进阶天数</th><th>状态</th><th>使用者</th><th>使用时间</th><th>创建时间</th><th></th>
+        </tr></thead>
+        <tbody>${rows.map(c => `
+          <tr>
+            <td class="codecell">${esc(c.code)}</td>
+            <td><span class="pill ${c.type==='premium'?'premium':'credits'}">${c.type==='premium'?'进阶':'积分'}</span></td>
+            <td>${c.credits_amount||0}</td>
+            <td>${c.type==='premium' ? (c.premium_days>0?c.premium_days+'天':'永久') : '—'}</td>
+            <td><span class="pill ${c.is_used?'used':'unused'}">${c.is_used?'已使用':'未使用'}</span></td>
+            <td>${c.used_by_phone?esc(c.used_by_phone):'—'}</td>
+            <td class="muted">${fmtTime(c.used_at)}</td>
+            <td class="muted">${fmtTime(c.created_at)}</td>
+            <td>${c.is_used?'':`<button class="btn btn-danger btn-sm" onclick="delCode(${c.id})">删除</button>`}</td>
+          </tr>`).join('')}</tbody>
+      </table>`;
+  } catch (e) {
+    box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+async function delCode(id) {
+  if (!confirm('确认删除该未使用的激活码？')) return;
+  try {
+    const r = await req('DELETE', '/codes/' + id);
+    if (r.code === 200) { toast('已删除','ok'); loadCodes(); }
+    else toast(r.msg || '删除失败', 'err');
+  } catch (e) { toast(e.message || '网络错误', 'err'); }
+}
+
+// ── 用户 ──
+function renderUsers() {
+  const v = document.getElementById('view');
+  v.innerHTML = `
+    <div class="panel">
+      <div class="toolbar">
+        <h3 style="margin:0">用户管理</h3>
+        <div class="row" style="align-items:center">
+          <input id="u-q" type="text" placeholder="搜索手机号/昵称" style="padding:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt);min-width:200px" onkeydown="if(event.key==='Enter')loadUsers()">
+          <button class="btn btn-ghost btn-sm" onclick="loadUsers()">搜索</button>
+        </div>
+      </div>
+      <div id="users-table"><div class="empty"><span class="spin"></span></div></div>
+    </div>`;
+  loadUsers();
+}
+
+async function loadUsers() {
+  const q = document.getElementById('u-q') ? document.getElementById('u-q').value.trim() : '';
+  const box = document.getElementById('users-table');
+  if (!box) return;
+  box.innerHTML = '<div class="empty"><span class="spin"></span></div>';
+  try {
+    const r = await req('GET', `/users?q=${encodeURIComponent(q)}&limit=100`);
+    const rows = (r.code===200 && r.data) ? r.data : [];
+    usersCache = rows;
+    if (!rows.length) { box.innerHTML = '<div class="empty">暂无用户</div>'; return; }
+    box.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>ID</th><th>手机号</th><th>昵称</th><th>角色</th><th>积分</th><th>进阶状态</th><th>到期时间</th><th>操作</th>
+        </tr></thead>
+        <tbody>${rows.map(u => `
+          <tr>
+            <td class="muted">${u.id}</td>
+            <td class="mono">${esc(u.phone||'—')}</td>
+            <td>${esc(u.nickname||'—')}</td>
+            <td>${u.role==='admin'?'<span class="pill premium">管理员</span>':'<span class="muted">普通</span>'}</td>
+            <td>${u.credits||0}</td>
+            <td><span class="pill ${u.premium?'on':'off'}">${u.premium?'已开通':'未开通'}</span></td>
+            <td class="muted">${u.premium_until?fmtDate(u.premium_until):'—'}</td>
+            <td>
+              <button class="btn btn-ghost btn-sm" onclick="grantPremium(${u.id})">开通进阶</button>
+              ${u.premium?`<button class="btn btn-danger btn-sm" onclick="revokePremium(${u.id})">取消</button>`:''}
+            </td>
+          </tr>`).join('')}</tbody>
+      </table>`;
+  } catch (e) {
+    box.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+async function grantPremium(id) {
+  const inp = prompt('开通进阶天数（输入 0 表示永久全开）：', '0');
+  if (inp === null) return;
+  const days = parseInt(inp);
+  if (isNaN(days) || days < 0) { toast('请输入有效天数','err'); return; }
+  try {
+    const r = await req('POST', `/users/${id}/premium`, { action:'grant', days });
+    if (r.code === 200) { toast(r.msg || '已开通','ok'); loadUsers(); }
+    else toast(r.msg || '操作失败', 'err');
+  } catch (e) { toast(e.message || '网络错误', 'err'); }
+}
+
+async function revokePremium(id) {
+  if (!confirm('确认取消该用户的进阶权限？')) return;
+  try {
+    const r = await req('POST', `/users/${id}/premium`, { action:'revoke' });
+    if (r.code === 200) { toast(r.msg || '已取消','ok'); loadUsers(); }
+    else toast(r.msg || '操作失败', 'err');
+  } catch (e) { toast(e.message || '网络错误', 'err'); }
+}
+
+// ── 启动 ──
+(function init(){
+  document.getElementById('lg-pass').addEventListener('keydown', e => { if (e.key==='Enter') doLogin(); });
+  if (TOKEN) {
+    // 用 stats 验证 token 是否有效
+    req('GET', '/stats').then(r => {
+      if (r && r.code === 200) enterApp();
+      else logout();
+    }).catch(() => logout());
+  }
+})();
+</script>
+</body>
+</html>

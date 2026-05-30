@@ -871,50 +871,28 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .clone-step-bar {
   background:#fff; border-radius:14px;
   margin:0 16px 12px; flex-shrink:0;
-  overflow-x:auto; -webkit-overflow-scrolling:touch;
-  scrollbar-width:none;
 }
-.clone-step-bar::-webkit-scrollbar { display:none; }
 .clone-step-bar-inner {
-  display:flex; align-items:flex-start;
-  justify-content:center;
-  padding:18px 14px 14px; min-width:100%; width:max-content; gap:0;
+  display:flex; align-items:stretch; gap:10px;
+  padding:14px;
 }
-.csb-step {
-  display:flex; flex-direction:column; align-items:center;
-  gap:7px; min-width:46px; flex-shrink:0; cursor:pointer;
-  -webkit-tap-highlight-color:transparent;
+.csb-seg {
+  flex:1; display:flex; align-items:center; justify-content:center;
+  gap:8px; height:46px; border-radius:12px;
+  font-size:14px; font-weight:600;
+  transition:background .2s, color .2s, box-shadow .2s;
 }
-.csb-node {
-  width:36px; height:36px; border-radius:50%;
+.csb-seg-badge {
+  width:22px; height:22px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  font-size:14px; font-weight:600; transition:transform .2s,box-shadow .2s;
-  position:relative;
+  font-size:12px; font-weight:700; flex-shrink:0;
 }
-.csb-node-done {
-  background:#FF6B35; color:#fff;
-  box-shadow:0 3px 10px rgba(255,107,53,.30);
-}
-.csb-node-active {
-  background:#FF6B35; color:#fff;
-  box-shadow:0 4px 16px rgba(255,107,53,.45);
-  transform:scale(1.12);
-}
-.csb-node-idle {
-  background:#F5F4F0; color:#C4C0B8;
-  border:2px solid #E4E2DA;
-}
-.csb-lbl { font-size:11px; white-space:nowrap; line-height:1; }
-.csb-lbl-done { color:#FF6B35; }
-.csb-lbl-active { color:#FF6B35; font-weight:600; }
-.csb-lbl-idle { color:#C4C0B8; }
-.csb-line {
-  width:16px; height:2px; flex-shrink:0; border-radius:1px;
-  margin-top:17px;
-  align-self:flex-start;
-}
-.csb-line-done { background:#FF6B35; }
-.csb-line-idle { background:#E4E2DA; }
+.csb-seg-active { background:linear-gradient(135deg,#FF6B35,#F5762A); color:#fff; box-shadow:0 4px 14px rgba(255,107,53,.35); }
+.csb-seg-active .csb-seg-badge { background:rgba(255,255,255,.25); color:#fff; }
+.csb-seg-done { background:#FFF1EA; color:#FF6B35; }
+.csb-seg-done .csb-seg-badge { background:#FF6B35; color:#fff; }
+.csb-seg-idle { background:#F5F4F0; color:#C4C0B8; }
+.csb-seg-idle .csb-seg-badge { background:#fff; color:#C4C0B8; border:1.5px solid #E4E2DA; }
 /* 开关 */
 .tog-sw { width:42px; height:24px; border-radius:12px; position:relative; cursor:pointer; transition:background .2s; flex-shrink:0; }
 .tog-sw-on { background:#FF6B35; }
@@ -1147,7 +1125,8 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .agents-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
 .agent-card { background: #fff; border-radius: 14px; padding: 16px 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: transform 0.1s; }
 .agent-card:active { transform: scale(0.97); }
-.agent-emoji { font-size: 30px; line-height: 1; }
+.agent-icon-chip { width: 46px; height: 46px; border-radius: 12px; background: #FAF5EF; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+.agent-icon-chip.lg { width: 52px; height: 52px; border-radius: 14px; }
 .agent-name { font-size: 15px; font-weight: 700; color: #1C1A16; }
 .agent-desc { font-size: 12px; color: #9C8E7A; line-height: 1.4; }
 .agent-cost { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #F97316; font-weight: 600; margin-top: 4px; }
@@ -2546,18 +2525,15 @@ function tCloneStepBar() {
   const cur = cloneCurrentStep();
   if (cur === 0) return '';
   const steps = ['提取','改写'];
-  const CHECK = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
-  let parts = [];
-  steps.forEach((label, i) => {
+  const CHECK = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
+  const segs = steps.map((label, i) => {
     const n = i + 1;
     const done = n < cur, active = n === cur;
-    const nc = done ? 'csb-node csb-node-done' : (active ? 'csb-node csb-node-active' : 'csb-node csb-node-idle');
-    const lc = done ? 'csb-lbl csb-lbl-done' : (active ? 'csb-lbl csb-lbl-active' : 'csb-lbl csb-lbl-idle');
-    const inner = done ? CHECK : n;
-    parts.push(`<div class="csb-step"><div class="${nc}">${inner}</div><div class="${lc}">${label}</div></div>`);
-    if (n < 2) parts.push(`<div class="csb-line ${done ? 'csb-line-done' : 'csb-line-idle'}"></div>`);
-  });
-  return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${parts.join('')}</div></div>`;
+    const cls = done ? 'csb-seg csb-seg-done' : (active ? 'csb-seg csb-seg-active' : 'csb-seg csb-seg-idle');
+    const badge = done ? CHECK : n;
+    return `<div class="${cls}"><span class="csb-seg-badge">${badge}</span><span>${label}</span></div>`;
+  }).join('');
+  return `<div class="clone-step-bar"><div class="clone-step-bar-inner">${segs}</div></div>`;
 }
 
 function tCloneActions(primary, secondary = []) {
@@ -7530,12 +7506,33 @@ function dismissNicknamePrompt() {
 
 // ===== 智能体 =====
 
+// 智能体线性图标（无 emoji，统一描边风格）
+const _AGENT_ICON_PATHS = {
+  book: '<path d="M4 5a2 2 0 0 1 2-2h6v16H6a2 2 0 0 0-2 2V5Z"/><path d="M20 5a2 2 0 0 0-2-2h-6v16h6a2 2 0 0 1 2 2V5Z"/>',
+  paw: '<ellipse cx="7" cy="9.5" rx="1.7" ry="2.3"/><ellipse cx="12" cy="6.8" rx="1.7" ry="2.5"/><ellipse cx="17" cy="9.5" rx="1.7" ry="2.3"/><path d="M12 12c-2.7 0-4.8 2-4.8 4.2 0 1.7 1.4 2.6 2.8 2.3.9-.2 1.3-.5 2-.5s1.1.3 2 .5c1.4.3 2.8-.6 2.8-2.3 0-2.2-2.1-4.2-4.8-4.2Z"/>',
+  bag: '<path d="M6 7h12l-1 13H7L6 7Z"/><path d="M9 7V6a3 3 0 0 1 6 0v1"/>',
+  spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/><path d="M18.5 15l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6.6-1.9Z"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'
+};
+function agentIcon(a, size = 28, color = '#1C1A16') {
+  const name = (a && a.name) || '';
+  let key = 'grid';
+  if (/绘本|故事|童|书/.test(name)) key = 'book';
+  else if (/宠|猫|狗|动物/.test(name)) key = 'paw';
+  else if (/电商|商品|商城|带货|主图|图片/.test(name)) key = 'bag';
+  else if (/素材|文案|标题|灵感|生成/.test(name)) key = 'spark';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${_AGENT_ICON_PATHS[key]}</svg>`;
+}
+function iconBolt(size = 12, color = '#F97316') {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>`;
+}
+
 function tAgents() {
   const { agentsList, agentsLoading, creditsBalance } = S;
 
   if (!getToken()) {
     return `<div class="page-wrap" style="padding:60px 24px;text-align:center;">
-      <div style="font-size:48px;margin-bottom:16px;">🤖</div>
+      <div style="margin-bottom:16px;display:flex;justify-content:center;">${agentIcon({name:''}, 48, '#C4C0B8')}</div>
       <div style="font-size:18px;font-weight:700;color:#1C1A16;margin-bottom:8px;">智能体大全</div>
       <div style="font-size:13px;color:#9C8E7A;margin-bottom:24px;">登录后解锁全部 AI 智能体</div>
       <button class="btn-primary" style="width:100%;max-width:200px;" onclick="setState({showAuthSheet:true})">立即登录</button>
@@ -7547,18 +7544,18 @@ function tAgents() {
   }
 
   const creditsHtml = creditsBalance !== null
-    ? `<div class="agent-credits-badge">⚡ 积分余额：${creditsBalance}</div>`
+    ? `<div class="agent-credits-badge">${iconBolt(13)} 积分余额：${creditsBalance}</div>`
     : '';
 
   const cardsHtml = agentsList.length === 0
-    ? `<div class="agents-empty">暂无智能体，请稍后再来 🙏</div>`
+    ? `<div class="agents-empty">暂无智能体，请稍后再来</div>`
     : `<div class="agents-grid">
         ${agentsList.map(a => `
           <div class="agent-card" onclick="openAgentDetail(${a.id})">
-            <div class="agent-emoji">${esc(a.emoji || '🤖')}</div>
+            <div class="agent-icon-chip">${agentIcon(a, 28)}</div>
             <div class="agent-name">${esc(a.name)}</div>
             <div class="agent-desc">${esc(a.description)}</div>
-            <div class="agent-cost">⚡ ${a.credits_cost} 积分</div>
+            <div class="agent-cost">${iconBolt(12)} ${a.credits_cost} 积分</div>
           </div>
         `).join('')}
       </div>`;
@@ -7579,7 +7576,7 @@ function tAgentDetailOverlay() {
     <div class="agent-detail-sheet">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="font-size:36px;line-height:1;">${esc(selectedAgent.emoji || '🤖')}</div>
+          <div class="agent-icon-chip lg">${agentIcon(selectedAgent, 30)}</div>
           <div>
             <div style="font-size:18px;font-weight:700;color:#1C1A16;">${esc(selectedAgent.name)}</div>
             <div style="font-size:13px;color:#9C8E7A;margin-top:2px;">${esc(selectedAgent.description)}</div>
@@ -7589,7 +7586,7 @@ function tAgentDetailOverlay() {
       </div>
       <div style="margin-bottom:16px;display:flex;align-items:center;gap:6px;">
         <span style="font-size:13px;color:#9C8E7A;">消耗积分：</span>
-        <span style="font-size:14px;font-weight:700;color:#F97316;">⚡ ${selectedAgent.credits_cost} 分</span>
+        <span style="font-size:14px;font-weight:700;color:#F97316;">${iconBolt(13)} ${selectedAgent.credits_cost} 分</span>
         ${creditsBalance !== null ? `<span style="font-size:12px;color:#9C8E7A;margin-left:4px;">（余额 ${creditsBalance} 分）</span>` : ''}
       </div>
       ${(selectedAgent.input_fields || []).map(f => `
@@ -7607,14 +7604,14 @@ function tAgentDetailOverlay() {
       <button class="agent-run-btn" onclick="runAgent()" ${agentRunning?'disabled':''}>
         ${agentRunning
           ? `<span style="width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;"></span> 生成中...`
-          : `✨ 立即生成`}
+          : `立即生成`}
       </button>
       ${agentErr ? `<div style="margin-top:12px;color:#EF4444;font-size:13px;text-align:center;">${esc(agentErr)}</div>` : ''}
       ${agentResult ? `
         <div style="margin-top:14px;">
           <div style="font-size:13px;font-weight:600;color:#4A4035;margin-bottom:8px;">生成结果</div>
           <div class="agent-result-box">${esc(typeof agentResult==='string'?agentResult:JSON.stringify(agentResult,null,2))}</div>
-          <button onclick="copyAgentResult()" style="margin-top:10px;width:100%;background:#F5F4F1;border:none;border-radius:10px;padding:11px 0;font-size:14px;font-weight:600;color:#4A4035;cursor:pointer;">📋 复制结果</button>
+          <button onclick="copyAgentResult()" style="margin-top:10px;width:100%;background:#F5F4F1;border:none;border-radius:10px;padding:11px 0;font-size:14px;font-weight:600;color:#4A4035;cursor:pointer;">复制结果</button>
         </div>
       ` : ''}
     </div>

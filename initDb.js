@@ -121,58 +121,66 @@ module.exports = async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
-  // ── 预置4个智能体（仅首次）────────────────────────────────────────────────
-  const { rows: existing } = await db.query('SELECT id FROM cw_agents LIMIT 1');
-  if (existing.length === 0) {
+  // ── 预置轻量小工具（6 个）──────────────────────────────────────────────────
+  // 设计稿小工具集。仅在「表为空」或「仅含旧占位智能体」时写入，避免覆盖管理员自定义。
+  const { rows: existingAgents } = await db.query('SELECT id, name FROM cw_agents');
+  const OLD_PLACEHOLDERS = ['儿童绘本', '萌宠视频', '电商图片', '素材生成'];
+  const onlyOldOrEmpty = existingAgents.length === 0 || existingAgents.every(a => OLD_PLACEHOLDERS.includes(a.name));
+  const hasNewSet = existingAgents.some(a => a.name === '标题党生成器');
+
+  if (onlyOldOrEmpty && !hasNewSet) {
+    // 清理旧占位（仅删除已知占位名，保护其它数据）
+    await db.query(
+      "DELETE FROM cw_agents WHERE name IN ('儿童绘本','萌宠视频','电商图片','素材生成')"
+    );
+
     const agents = [
       {
-        name: '儿童绘本',
-        description: '输入故事主题，AI 生成儿童绘本故事与配图',
-        emoji: '📚',
-        output_type: 'image_text',
-        credits_cost: 5,
-        sort_order: 1,
+        name: '标题党生成器',
+        description: '一句话生成 10 个高点击标题',
+        credits_cost: 2, sort_order: 1,
         input_fields: JSON.stringify([
-          { key: 'theme', label: '故事主题', type: 'text', placeholder: '例如：小兔子找朋友、勇敢的小熊...' },
-          { key: 'age', label: '适合年龄', type: 'select', options: ['3-5岁','6-8岁','9-12岁'] },
-          { key: 'style', label: '绘本风格', type: 'select', options: ['温馨可爱','奇幻冒险','科普知识'] }
+          { key: 'topic', label: '主题/内容', type: 'textarea', placeholder: '用一句话描述你的内容或主题...' }
         ])
       },
       {
-        name: '萌宠视频',
-        description: '输入宠物信息，生成萌宠短视频脚本与素材建议',
-        emoji: '🐾',
-        output_type: 'text',
-        credits_cost: 5,
-        sort_order: 2,
+        name: '黄金开头钩子',
+        description: '3 秒抓住眼球的开场白',
+        credits_cost: 2, sort_order: 2,
         input_fields: JSON.stringify([
-          { key: 'pet_type', label: '宠物类型', type: 'text', placeholder: '例如：金毛、布偶猫、仓鼠...' },
-          { key: 'theme', label: '视频主题', type: 'text', placeholder: '例如：日常记录、搞笑片段、技能展示...' }
+          { key: 'topic', label: '视频主题', type: 'text', placeholder: '例如：减脂餐、职场穿搭、旅行攻略...' }
         ])
       },
       {
-        name: '电商图片',
-        description: '输入商品信息，生成高转化率的电商主图文案',
-        emoji: '🛍️',
-        output_type: 'text',
-        credits_cost: 5,
-        sort_order: 3,
+        name: '选题灵感库',
+        description: '按赛道挖掘当下热门选题',
+        credits_cost: 1, sort_order: 3,
         input_fields: JSON.stringify([
-          { key: 'product', label: '商品名称', type: 'text', placeholder: '例如：保温杯、连衣裙...' },
-          { key: 'selling_points', label: '核心卖点', type: 'textarea', placeholder: '输入商品的主要特点和优势...' },
-          { key: 'style', label: '风格', type: 'select', options: ['简洁大气','活泼促销','高端品质'] }
+          { key: 'industry', label: '赛道/行业', type: 'text', placeholder: '例如：母婴、美妆、数码、健身...' }
         ])
       },
       {
-        name: '素材生成',
-        description: '输入需求描述，一键生成各类创作素材',
-        emoji: '✨',
-        output_type: 'text',
-        credits_cost: 3,
-        sort_order: 4,
+        name: '评论区神回复',
+        description: '高情商互动，养号涨粉',
+        credits_cost: 1, sort_order: 4,
         input_fields: JSON.stringify([
-          { key: 'type', label: '素材类型', type: 'select', options: ['文案标题','话题标签','评论回复','产品描述'] },
-          { key: 'desc', label: '需求描述', type: 'textarea', placeholder: '描述你需要的素材内容...' }
+          { key: 'comment', label: '原评论', type: 'textarea', placeholder: '粘贴需要回复的评论内容...' }
+        ])
+      },
+      {
+        name: '关键词标签',
+        description: '智能推荐高流量话题标签',
+        credits_cost: 1, sort_order: 5,
+        input_fields: JSON.stringify([
+          { key: 'content', label: '内容描述', type: 'textarea', placeholder: '描述你的内容，生成相关话题标签...' }
+        ])
+      },
+      {
+        name: '一键润色',
+        description: '把口水话改成有质感的表达',
+        credits_cost: 2, sort_order: 6,
+        input_fields: JSON.stringify([
+          { key: 'text', label: '原文', type: 'textarea', placeholder: '粘贴需要润色的文案...' }
         ])
       }
     ];
@@ -180,10 +188,10 @@ module.exports = async function initDb() {
     for (const a of agents) {
       await db.query(
         'INSERT INTO cw_agents (name, description, emoji, output_type, credits_cost, sort_order, input_fields) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [a.name, a.description, a.emoji, a.output_type, a.credits_cost, a.sort_order, a.input_fields]
+        [a.name, a.description, '', 'text', a.credits_cost, a.sort_order, a.input_fields]
       );
     }
-    console.log('[DB] 预置4个智能体完成');
+    console.log('[DB] 已预置 6 个轻量小工具');
   }
 
   console.log('[DB] 数据库初始化完成');

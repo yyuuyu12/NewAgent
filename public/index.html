@@ -1120,16 +1120,20 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .speed-slider { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:3px; outline:none; cursor:pointer; }
 .speed-slider::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:#FF6B35; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.2); }
 /* 智能体 */
-.agents-page { padding: 16px; padding-bottom: 80px; }
-.agents-section-title { font-size: 12px; font-weight: 600; color: #9C8E7A; margin-bottom: 10px; margin-top: 4px; letter-spacing: 0.6px; text-transform: uppercase; }
-.agents-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-.agent-card { background: #fff; border-radius: 14px; padding: 16px 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: transform 0.1s; }
+.agents-page { padding: 20px 18px; padding-bottom: 80px; }
+.agents-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+.agents-title { font-size: 27px; font-weight: 800; color: #1C1A16; letter-spacing: -0.5px; line-height: 1.1; }
+.agents-credits-pill { background: #fff; border-radius: 22px; padding: 8px 15px; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; color: #1C1A16; box-shadow: 0 2px 12px rgba(0,0,0,0.07); flex-shrink: 0; }
+.agents-subtitle { font-size: 14px; color: #9C8E7A; line-height: 1.65; margin-bottom: 24px; }
+.agents-section-title { font-size: 19px; font-weight: 800; color: #1C1A16; margin-bottom: 14px; margin-top: 2px; letter-spacing: 0; text-transform: none; }
+.agents-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.agent-card { background: #fff; border-radius: 16px; padding: 18px 16px; cursor: pointer; box-shadow: 0 3px 16px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: flex-start; gap: 7px; transition: transform 0.1s; }
 .agent-card:active { transform: scale(0.97); }
-.agent-icon-chip { width: 46px; height: 46px; border-radius: 12px; background: #FAF5EF; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
-.agent-icon-chip.lg { width: 52px; height: 52px; border-radius: 14px; }
-.agent-name { font-size: 15px; font-weight: 700; color: #1C1A16; }
-.agent-desc { font-size: 12px; color: #9C8E7A; line-height: 1.4; }
-.agent-cost { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #F97316; font-weight: 600; margin-top: 4px; }
+.agent-icon-chip { width: 52px; height: 52px; border-radius: 15px; background: #FAF5EF; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; }
+.agent-icon-chip.lg { width: 52px; height: 52px; border-radius: 15px; }
+.agent-name { font-size: 16px; font-weight: 700; color: #1C1A16; }
+.agent-desc { font-size: 12.5px; color: #9C8E7A; line-height: 1.5; flex: 1; }
+.agent-cost { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #9C8E7A; font-weight: 500; margin-top: 10px; }
 .agent-detail-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: flex; align-items: flex-end; }
 .agent-detail-sheet { background: #fff; border-radius: 20px 20px 0 0; width: 100%; max-height: 88vh; overflow-y: auto; padding: 20px 16px 40px; }
 .agent-field-label { font-size: 13px; font-weight: 600; color: #4A4035; margin-bottom: 6px; margin-top: 14px; }
@@ -7507,34 +7511,66 @@ function dismissNicknamePrompt() {
 // ===== 智能体 =====
 
 // 智能体线性图标（无 emoji，统一描边风格）
-const _AGENT_ICON_PATHS = {
-  book: '<path d="M4 5a2 2 0 0 1 2-2h6v16H6a2 2 0 0 0-2 2V5Z"/><path d="M20 5a2 2 0 0 0-2-2h-6v16h6a2 2 0 0 1 2 2V5Z"/>',
-  paw: '<ellipse cx="7" cy="9.5" rx="1.7" ry="2.3"/><ellipse cx="12" cy="6.8" rx="1.7" ry="2.5"/><ellipse cx="17" cy="9.5" rx="1.7" ry="2.3"/><path d="M12 12c-2.7 0-4.8 2-4.8 4.2 0 1.7 1.4 2.6 2.8 2.3.9-.2 1.3-.5 2-.5s1.1.3 2 .5c1.4.3 2.8-.6 2.8-2.3 0-2.2-2.1-4.2-4.8-4.2Z"/>',
-  bag: '<path d="M6 7h12l-1 13H7L6 7Z"/><path d="M9 7V6a3 3 0 0 1 6 0v1"/>',
-  spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/><path d="M18.5 15l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6.6-1.9Z"/>',
-  grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'
+// 智能体线性图标路径（描边风格，无 emoji）
+const _AGENT_SKIN_PATHS = {
+  title:   '<path d="M5 5.5h14M12 5.5V19M9 19h6"/>',
+  spark:   '<path d="M12 3l1.9 6.1L20 11l-6.1 1.9L12 19l-1.9-6.1L4 11l6.1-1.9L12 3Z"/>',
+  list:    '<circle cx="5" cy="7" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="5" cy="17" r="1.3"/><path d="M9 7h11M9 12h9M9 17h11"/>',
+  chat:    '<path d="M5 5.5h14a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2H10l-4.2 3.4a.5.5 0 0 1-.8-.4V7.5a2 2 0 0 1 2-2Z"/>',
+  hash:    '<path d="M9.5 4 7.5 20M16.5 4l-2 16M4 9.2h16M3.5 14.8h16"/>',
+  refresh: '<path d="M20.5 8a8 8 0 1 0 1.2 6.5"/><path d="M20.5 3.5V8H16"/>',
+  grid:    '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'
 };
-function agentIcon(a, size = 28, color = '#1C1A16') {
+// 已知小工具的配色 + 图标
+const _AGENT_SKINS = {
+  '标题党生成器': { bg:'#FCEBDA', fg:'#E89A52', icon:'title' },
+  '黄金开头钩子': { bg:'#F9DEEA', fg:'#DE89AE', icon:'spark' },
+  '选题灵感库':   { bg:'#DCEEDC', fg:'#6FAE78', icon:'list' },
+  '评论区神回复': { bg:'#E2DFF6', fg:'#8A80D6', icon:'chat' },
+  '关键词标签':   { bg:'#D6EDE5', fg:'#57AD97', icon:'hash' },
+  '一键润色':     { bg:'#FCEBDA', fg:'#E89A52', icon:'refresh' }
+};
+const _AGENT_PALETTE = [
+  { bg:'#FCEBDA', fg:'#E89A52' }, { bg:'#F9DEEA', fg:'#DE89AE' },
+  { bg:'#DCEEDC', fg:'#6FAE78' }, { bg:'#E2DFF6', fg:'#8A80D6' },
+  { bg:'#D6EDE5', fg:'#57AD97' }
+];
+function agentSkin(a, idx = 0) {
   const name = (a && a.name) || '';
-  let key = 'grid';
-  if (/绘本|故事|童|书/.test(name)) key = 'book';
-  else if (/宠|猫|狗|动物/.test(name)) key = 'paw';
-  else if (/电商|商品|商城|带货|主图|图片/.test(name)) key = 'bag';
-  else if (/素材|文案|标题|灵感|生成/.test(name)) key = 'spark';
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${_AGENT_ICON_PATHS[key]}</svg>`;
+  if (_AGENT_SKINS[name]) return _AGENT_SKINS[name];
+  let icon = 'grid';
+  if (/标题/.test(name)) icon = 'title';
+  else if (/钩子|开头|开场|文案/.test(name)) icon = 'spark';
+  else if (/选题|灵感|赛道/.test(name)) icon = 'list';
+  else if (/评论|回复|互动/.test(name)) icon = 'chat';
+  else if (/标签|关键词|话题/.test(name)) icon = 'hash';
+  else if (/润色|改写|改稿/.test(name)) icon = 'refresh';
+  const c = _AGENT_PALETTE[idx % _AGENT_PALETTE.length];
+  return { bg: c.bg, fg: c.fg, icon };
 }
-function iconBolt(size = 12, color = '#F97316') {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>`;
+function agentIconSk(sk, size = 26) {
+  const sw = sk.icon === 'title' ? 2 : 1.8;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${sk.fg}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">${_AGENT_SKIN_PATHS[sk.icon] || _AGENT_SKIN_PATHS.grid}</svg>`;
+}
+// 积分硬币图标：mode='gold' 顶部余额；默认灰色用于卡片计费
+function iconCoin(size = 15, mode = 'gray') {
+  const fill   = mode === 'gold' ? '#F4A94C' : 'none';
+  const stroke = mode === 'gold' ? '#F4A94C' : '#C4BCB0';
+  const txt    = mode === 'gold' ? '#fff'    : '#A89E90';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="vertical-align:-2px;flex-shrink:0;">
+    <circle cx="12" cy="12" r="9.3" fill="${fill}" stroke="${stroke}" stroke-width="1.6"/>
+    <text x="12" y="16" text-anchor="middle" font-size="11" font-weight="700" fill="${txt}" font-family="-apple-system,'PingFang SC',sans-serif">积</text>
+  </svg>`;
 }
 
 function tAgents() {
   const { agentsList, agentsLoading, creditsBalance } = S;
 
   if (!getToken()) {
-    return `<div class="page-wrap" style="padding:60px 24px;text-align:center;">
-      <div style="margin-bottom:16px;display:flex;justify-content:center;">${agentIcon({name:''}, 48, '#C4C0B8')}</div>
-      <div style="font-size:18px;font-weight:700;color:#1C1A16;margin-bottom:8px;">智能体大全</div>
-      <div style="font-size:13px;color:#9C8E7A;margin-bottom:24px;">登录后解锁全部 AI 智能体</div>
+    return `<div class="page-wrap agents-page" style="padding:60px 24px;text-align:center;">
+      <div style="margin-bottom:16px;display:flex;justify-content:center;">${agentIconSk({fg:'#C4C0B8',icon:'grid'}, 48)}</div>
+      <div style="font-size:18px;font-weight:700;color:#1C1A16;margin-bottom:8px;">智能体</div>
+      <div style="font-size:13px;color:#9C8E7A;margin-bottom:24px;">登录后解锁全部 AI 小工具</div>
       <button class="btn-primary" style="width:100%;max-width:200px;" onclick="setState({showAuthSheet:true})">立即登录</button>
     </div>`;
   }
@@ -7543,28 +7579,32 @@ function tAgents() {
     return `<div class="page-wrap agents-page"><div class="agents-empty">加载中...</div></div>`;
   }
 
-  const creditsHtml = creditsBalance !== null
-    ? `<div class="agent-credits-badge">${iconBolt(13)} 积分余额：${creditsBalance}</div>`
+  const pill = creditsBalance !== null
+    ? `<div class="agents-credits-pill">${iconCoin(18,'gold')}<span>${creditsBalance}</span></div>`
     : '';
 
   const cardsHtml = agentsList.length === 0
-    ? `<div class="agents-empty">暂无智能体，请稍后再来</div>`
+    ? `<div class="agents-empty">暂无小工具，请稍后再来</div>`
     : `<div class="agents-grid">
-        ${agentsList.map(a => `
+        ${agentsList.map((a, idx) => {
+          const sk = agentSkin(a, idx);
+          return `
           <div class="agent-card" onclick="openAgentDetail(${a.id})">
-            <div class="agent-icon-chip">${agentIcon(a, 28)}</div>
+            <div class="agent-icon-chip" style="background:${sk.bg};">${agentIconSk(sk, 26)}</div>
             <div class="agent-name">${esc(a.name)}</div>
             <div class="agent-desc">${esc(a.description)}</div>
-            <div class="agent-cost">${iconBolt(12)} ${a.credits_cost} 积分</div>
-          </div>
-        `).join('')}
+            <div class="agent-cost">${iconCoin(15)}<span>${a.credits_cost} 积分 / 次</span></div>
+          </div>`;
+        }).join('')}
       </div>`;
 
   return `<div class="page-wrap agents-page">
-    <div style="font-size:20px;font-weight:800;color:#1C1A16;margin-bottom:4px;">智能体大全</div>
-    <div style="font-size:13px;color:#9C8E7A;margin-bottom:14px;">AI 驱动的专业创作工具</div>
-    ${creditsHtml}
-    <div class="agents-section-title">基础能力</div>
+    <div class="agents-header">
+      <div class="agents-title">智能体</div>
+      ${pill}
+    </div>
+    <div class="agents-subtitle">一组轻量小工具，帮你把灵感快速变成内容。按积分计量，点开即用。</div>
+    <div class="agents-section-title">小工具</div>
     ${cardsHtml}
   </div>`;
 }
@@ -7576,7 +7616,7 @@ function tAgentDetailOverlay() {
     <div class="agent-detail-sheet">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div class="agent-icon-chip lg">${agentIcon(selectedAgent, 30)}</div>
+          ${(()=>{ const sk = agentSkin(selectedAgent); return `<div class="agent-icon-chip lg" style="background:${sk.bg};">${agentIconSk(sk, 30)}</div>`; })()}
           <div>
             <div style="font-size:18px;font-weight:700;color:#1C1A16;">${esc(selectedAgent.name)}</div>
             <div style="font-size:13px;color:#9C8E7A;margin-top:2px;">${esc(selectedAgent.description)}</div>
@@ -7586,7 +7626,7 @@ function tAgentDetailOverlay() {
       </div>
       <div style="margin-bottom:16px;display:flex;align-items:center;gap:6px;">
         <span style="font-size:13px;color:#9C8E7A;">消耗积分：</span>
-        <span style="font-size:14px;font-weight:700;color:#F97316;">${iconBolt(13)} ${selectedAgent.credits_cost} 分</span>
+        <span style="font-size:14px;font-weight:700;color:#1C1A16;display:inline-flex;align-items:center;gap:4px;">${iconCoin(15)} ${selectedAgent.credits_cost} 积分 / 次</span>
         ${creditsBalance !== null ? `<span style="font-size:12px;color:#9C8E7A;margin-left:4px;">（余额 ${creditsBalance} 分）</span>` : ''}
       </div>
       ${(selectedAgent.input_fields || []).map(f => `

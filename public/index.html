@@ -35,6 +35,7 @@ input, button, textarea { -webkit-appearance: none; appearance: none; font-famil
 /* === CONTENT === */
 .page-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0; }
 .tab-page { padding: 12px 16px 100px; }
+.ws-cta-float { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 83px); width: 100%; max-width: 480px; padding: 14px 16px 16px; background: linear-gradient(to top, #F7F5F1 58%, rgba(247,245,241,0)); z-index: 50; box-sizing: border-box; }
 
 /* === BUTTONS === */
 .btn-primary {
@@ -1843,7 +1844,7 @@ function tWorkshopIntro() {
   ];
   const cases = ['助农带货 · 土鸡', '美食探店 · 口播', '知识科普 · 真人', '穿搭种草 · 数字人', '萌宠日常 · 配音', '本地生活 · 成片'];
   const playSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>`;
-  return `<div class="tab-page" style="padding-top:4px">
+  return `<div class="tab-page" style="padding-top:4px;padding-bottom:150px">
     <div style="display:flex;justify-content:center;margin-bottom:6px">
       <div style="width:62%;aspect-ratio:9/16;border-radius:22px;position:relative;overflow:hidden;background:linear-gradient(160deg,#3A332C,#211C17);display:flex;align-items:center;justify-content:center">
         <span style="font-size:12px;color:rgba(255,255,255,0.45);font-family:ui-monospace,monospace">数字人口播样片</span>
@@ -1873,9 +1874,9 @@ function tWorkshopIntro() {
         <span style="position:absolute;bottom:8px;left:8px;right:8px;font-size:9px;color:rgba(255,255,255,0.7);font-family:ui-monospace,monospace;line-height:1.3">${c}</span>
       </div>`).join('')}
     </div>
-    <div style="padding:24px 0 0">
+    <div class="ws-cta-float">
       <div class="btn-primary" onclick="setState({workshopView:'activate'});render()">了解如何开通</div>
-      <div style="text-align:center;font-size:12px;color:#B0AA9F;margin-top:12px">声音 · 数字人 · 剪辑，一次开通全部解锁</div>
+      <div style="text-align:center;font-size:12px;color:#B0AA9F;margin-top:10px">声音 · 数字人 · 剪辑，一次开通全部解锁</div>
     </div>
   </div>`;
 }

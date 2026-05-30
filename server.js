@@ -35,6 +35,10 @@ app.get(['/admin', '/admin.html'], (req, res) => {
     if (err) res.status(404).json({ code: 404, msg: '管理后台页面不存在' });
   });
 });
+// 任何未匹配的 /api 请求（含 POST/PUT/DELETE）统一返回 JSON 404，避免前端收到 HTML
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ code: 404, msg: `接口不存在: ${req.method} ${req.path}` });
+});
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'), (err) => {
     if (err) res.status(404).json({ code: 404, msg: '接口不存在' });

@@ -25,34 +25,77 @@ function extractDouyinVideoUrl(input) {
   return '';
 }
 
-// 拉取单个抖音视频的真实文案（字幕优先，无字幕降级用描述）
-async function fetchVideoScript(url, tikhubKey) {
-  const videoResponse = await fetch(
-    `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_one_video?url=${encodeURIComponent(url.trim())}`,
+// 从 URL 或短链中解析 aweme_id（跟随重定向）
+async function resolveAwemeId(url) {
+  // 1. 直接从完整 URL 提取（/video/XXXXXXXXXXXXXXXX）
+  const direct = url.match(/\/video\/(\d{10,20})/);
+  if (direct) return direct[1];
+  // 2. 从查询参数提取
+  const qp = url.match(/[?&]aweme_id=(\d{10,20})/);
+  if (qp) return qp[1];
+  // 3. 短链跟随重定向
+  try {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 6000);
+    const resp = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal });
+    clearTimeout(tid);
+    const finalUrl = resp.url || '';
+    const m = finalUrl.match(/\/video\/(\d{10,20})/);
+    if (m) return m[1];
+  } catch {}
+  return null;
+}
+
+// 用 aweme_id 查视频详情（TikHub 新接口）
+async function fetchVideoByAwemeId(awemeId, tikhubKey) {
+  // 先试 app v3（参数 aweme_id）
+  const r1 = await fetch(
+    `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_one_video?aweme_id=${awemeId}`,
     { headers: { Authorization: `Bearer ${tikhubKey}` } }
   );
-  if (!videoResponse.ok) throw new Error(`视频解析失败: ${await videoResponse.text()}`);
-  const videoData = await videoResponse.json();
-  const item = videoData?.data?.aweme_detail;
-  if (!item) throw new Error('无法获取视频信息，请检查链接是否正确');
-
-  let subtitle = '';
-  const awemeId = item.aweme_id;
-  if (awemeId) {
-    try {
-      const subtitleResp = await fetch(
-        `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_subtitle?aweme_id=${awemeId}`,
-        { headers: { Authorization: `Bearer ${tikhubKey}` } }
-      );
-      if (subtitleResp.ok) {
-        const subData = await subtitleResp.json();
-        const subtitles = subData?.data?.subtitle_infos?.[0]?.subtitle_list;
-        if (subtitles?.length) {
-          subtitle = subtitles.map(s => s.words?.map(w => w.word).join('') || s.text).join('');
-        }
-      }
-    } catch (_) {}
+  if (r1.ok) {
+    const d = await r1.json();
+    if (d?.data?.aweme_detail) return d.data.aweme_detail;
   }
+  // 降级：web 接口
+  const r2 = await fetch(
+    `https://api.tikhub.io/api/v1/douyin/web/fetch_one_video?aweme_id=${awemeId}`,
+    { headers: { Authorization: `Bearer ${tikhubKey}` } }
+  );
+  if (r2.ok) {
+    const d = await r2.json();
+    if (d?.data?.aweme_detail) return d.data.aweme_detail;
+    if (d?.data?.item_list?.[0]) return d.data.item_list[0];
+  }
+  return null;
+}
+
+// 拉取单个抖音视频的真实文案（字幕优先，无字幕降级用描述）
+async function fetchVideoScript(url, tikhubKey) {
+  // 解析 aweme_id（支持短链重定向）
+  const awemeId = await resolveAwemeId(url);
+  if (!awemeId) throw new Error('无法从链接中解析视频ID，请确认链接完整且为抖音视频链接');
+
+  // 获取视频详情
+  const item = await fetchVideoByAwemeId(awemeId, tikhubKey);
+  if (!item) throw new Error('视频信息获取失败，请检查链接是否有效');
+
+  // 拉取字幕
+  let subtitle = '';
+  try {
+    const subtitleResp = await fetch(
+      `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_subtitle?aweme_id=${awemeId}`,
+      { headers: { Authorization: `Bearer ${tikhubKey}` } }
+    );
+    if (subtitleResp.ok) {
+      const subData = await subtitleResp.json();
+      const subtitles = subData?.data?.subtitle_infos?.[0]?.subtitle_list;
+      if (subtitles?.length) {
+        subtitle = subtitles.map(s => s.words?.map(w => w.word).join('') || s.text).join('');
+      }
+    }
+  } catch {}
+
   return {
     script: subtitle || item.desc || '',
     desc: item.desc || '',

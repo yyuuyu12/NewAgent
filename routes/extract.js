@@ -31,33 +31,59 @@ router.post('/video', requireAuth, async (req, res) => {
     const tikhubKey = rows[0]?.value;
     if (!tikhubKey) return res.status(503).json({ code: 503, msg: '抖音解析未配置，请联系管理员' });
 
-    const videoResponse = await fetch(
-      `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_one_video?url=${encodeURIComponent(url.trim())}`,
-      { headers: { 'Authorization': `Bearer ${tikhubKey}` } }
-    );
-    if (!videoResponse.ok) throw new Error(`视频解析失败: ${await videoResponse.text()}`);
+    // 从输入文本中提取真实链接（支持分享文本）
+    const inputText = url.trim();
+    const urlMatch = inputText.match(/https?:\/\/[^\s，。,）)]+/) || inputText.match(/(?:v\.douyin\.com|www\.douyin\.com)\/[^\s，。,]+/);
+    const cleanUrl = urlMatch ? urlMatch[0].replace(/[）)>》\]]+$/, '') : inputText;
+    const finalUrl = cleanUrl.startsWith('http') ? cleanUrl : 'https://' + cleanUrl;
 
-    const videoData = await videoResponse.json();
-    const item = videoData?.data?.aweme_detail;
-    if (!item) throw new Error('无法获取视频信息，请检查链接是否正确');
-
-    const awemeId = item.aweme_id;
-    let subtitle = '';
-    if (awemeId) {
+    // 解析 aweme_id（支持短链重定向）
+    let awemeId = null;
+    const direct = finalUrl.match(/\/video\/(\d{10,20})/);
+    if (direct) {
+      awemeId = direct[1];
+    } else {
       try {
-        const subtitleResp = await fetch(
-          `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_subtitle?aweme_id=${awemeId}`,
-          { headers: { 'Authorization': `Bearer ${tikhubKey}` } }
-        );
-        if (subtitleResp.ok) {
-          const subData = await subtitleResp.json();
-          const subtitles = subData?.data?.subtitle_infos?.[0]?.subtitle_list;
-          if (subtitles?.length) {
-            subtitle = subtitles.map(s => s.words?.map(w => w.word).join('') || s.text).join('\n');
-          }
-        }
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 6000);
+        const resp = await fetch(finalUrl, { method: 'GET', redirect: 'follow', signal: controller.signal });
+        clearTimeout(tid);
+        const m = (resp.url || '').match(/\/video\/(\d{10,20})/);
+        if (m) awemeId = m[1];
       } catch {}
     }
+    if (!awemeId) throw new Error('无法解析视频ID，请确认是有效的抖音视频链接');
+
+    // 用 aweme_id 获取视频详情（兼容新旧 TikHub 接口）
+    let item = null;
+    for (const apiUrl of [
+      `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_one_video?aweme_id=${awemeId}`,
+      `https://api.tikhub.io/api/v1/douyin/web/fetch_one_video?aweme_id=${awemeId}`,
+    ]) {
+      const r = await fetch(apiUrl, { headers: { Authorization: `Bearer ${tikhubKey}` } });
+      if (r.ok) {
+        const d = await r.json();
+        item = d?.data?.aweme_detail || d?.data?.item_list?.[0] || null;
+        if (item) break;
+      }
+    }
+    if (!item) throw new Error('视频信息获取失败，请检查链接是否有效');
+
+    // 拉取字幕
+    let subtitle = '';
+    try {
+      const subtitleResp = await fetch(
+        `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_subtitle?aweme_id=${awemeId}`,
+        { headers: { Authorization: `Bearer ${tikhubKey}` } }
+      );
+      if (subtitleResp.ok) {
+        const subData = await subtitleResp.json();
+        const subtitles = subData?.data?.subtitle_infos?.[0]?.subtitle_list;
+        if (subtitles?.length) {
+          subtitle = subtitles.map(s => s.words?.map(w => w.word).join('') || s.text).join('\n');
+        }
+      }
+    } catch {}
 
     const script = subtitle || item.desc || '未能提取到文案内容';
     res.json({

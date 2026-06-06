@@ -8087,13 +8087,13 @@ function tOriginalLearning() {
     <!-- 输入 -->
     <div style="margin:0 22px 16px">
       <div style="font-size:13px;color:#6E6860;font-weight:600;margin-bottom:8px">${type==='account'?'输入账号主页链接（将分析最近多条视频）':'输入单个视频链接'}</div>
-      <div style="background:#fff;border-radius:14px;border:1.5px solid ${url?'#F5602A':'#EDE9E3'};padding:12px 14px;transition:border-color .2s">
-        <textarea id="learning-url-input" oninput="S.originalLearningUrl=this.value"
+      <div id="learning-url-wrap" style="background:#fff;border-radius:14px;border:1.5px solid ${url?'#F5602A':'#EDE9E3'};padding:12px 14px;transition:border-color .2s">
+        <textarea id="learning-url-input" oninput="S.originalLearningUrl=this.value;_origLearnInputState()"
           placeholder="${type==='account'?'例如：https://www.douyin.com/user/xxx':'例如：https://v.douyin.com/xxx'}"
           style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:52px;line-height:1.6;box-sizing:border-box">${esc(url)}</textarea>
       </div>
     </div>
-    <button type="button" ${(!url.trim()||loading)?'disabled':''} onclick="analyzeOriginalLearning()"
+    <button type="button" id="learning-analyze-btn" onclick="analyzeOriginalLearning()"
             style="width:calc(100% - 44px);margin:0 22px 16px;padding:14px 0;border:none;border-radius:16px;background:${(!url.trim()||loading)?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${(!url.trim()||loading)?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${(!url.trim()||loading)?'default':'pointer'}">
       ${loading ? '分析中…' : (type==='account'?'分析账号文案规律':'提取视频规律')}
     </button>
@@ -8295,6 +8295,18 @@ function _origChatInputState() {
     const wrap = inputEl.parentElement;
     if (wrap) wrap.style.borderColor = (S.originalInput && S.originalInput.trim()) ? '#F5602A' : '#EDE9E3';
   }
+}
+
+function _origLearnInputState() {
+  const active = !!(S.originalLearningUrl && S.originalLearningUrl.trim()) && !S.originalLearningLoading;
+  const btn = document.getElementById('learning-analyze-btn');
+  if (btn) {
+    btn.style.background = active ? 'linear-gradient(135deg,#FF8040,#F5602A)' : '#E8E4DF';
+    btn.style.color = active ? '#fff' : '#B0AA9F';
+    btn.style.cursor = active ? 'pointer' : 'default';
+  }
+  const wrap = document.getElementById('learning-url-wrap');
+  if (wrap) wrap.style.borderColor = (S.originalLearningUrl && S.originalLearningUrl.trim()) ? '#F5602A' : '#EDE9E3';
 }
 
 async function copyOriginalDoc(btnId) {

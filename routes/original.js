@@ -287,30 +287,41 @@ router.post('/projects/:id/chat', requireAuth, async (req, res) => {
     const currentDoc = project.doc || '';
     const isFirstMessage = !currentDoc.trim();
 
-    const systemPrompt = `你是一位专注于短视频口播文案的创作助手，帮助用户创作原创爆款文案。
+    // 取最近的对话历史（最多 8 条）作为上下文
+    const { rows: histRows } = await db.query(
+      'SELECT role, content FROM cw_original_messages WHERE project_id = ? ORDER BY id DESC LIMIT 8',
+      [projectId]
+    );
+    const history = (histRows || []).reverse()
+      .map(m => `${m.role === 'user' ? '用户' : '助手'}：${m.content}`)
+      .join('\n');
 
-用户的 Skill 规则（每次创作必须遵守）：
+    const systemPrompt = `你是一位专注于短视频口播文案的创作助手，正在和用户一起打磨一条原创视频文案。像真人一样自然对话——不要每句话都堆砌套话。
+
+用户的 Skill 规则（创作文案时应尽量遵守）：
 ${rulesText}
 
 当前项目：${project.title}${project.brief ? `\n项目简述：${project.brief}` : ''}
 
-${isFirstMessage ? '当前还没有文案，请根据项目描述和 Skill 规则，为这条视频创作第一版文案。' : `当前活文档（用户最新的文案版本）：
+${isFirstMessage ? '目前还没有正式文案。' : `当前文案（用户最新版本）：
 ---
 ${currentDoc}
----
-请根据用户的修改要求，更新文案。`}
+---`}
 
-回复要求：
-1. 第一行：简短说明你做了什么改动（≤40字，如"已用反差钩子改写开场"）
-2. 然后是【新文案】标记
-3. 完整的新版文案内容
-4. 最后是【/新文案】标记
+${history ? `最近的对话：\n${history}\n` : ''}
 
-格式示例：
-已用数字开头的钩子改写，节奏更紧凑。
+【关键规则——决定是否更新文案】
+- 如果用户只是打招呼、提问、聊天、表达想法或还在讨论方向（例如"你好""你能做什么""我想做个减脂的选题""这个开头你觉得怎么样"），就**只用自然口语回复**，绝对不要输出【新文案】标记，不要硬写文案。
+- 只有当用户**明确要你写文案、改文案、生成某一版**（例如"帮我写一版""把开头改得更有冲突""再紧凑一点""换个钩子"）时，才在回复末尾附上完整新文案，用【新文案】和【/新文案】包裹。
+- 输出文案时，先用一句话（≤40字）说明你这次改了什么，再换行写【新文案】块。
+
+输出文案时的格式示例：
+已用"你以为…其实…"的反差钩子重写了开场。
 【新文案】
 完整文案内容...
-【/新文案】`;
+【/新文案】
+
+只聊天时直接回复，不要带任何标记。`;
 
     const aiRaw = await callAI(systemPrompt + '\n\n用户：' + message.trim(), { maxTokens: 1500, temperature: 0.85 });
 

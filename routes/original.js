@@ -13,6 +13,18 @@ async function getTikhubKey() {
   return rows?.[0]?.value || '';
 }
 
+// 从用户输入（可能是分享文本、短链、完整链接）中提取可用的抖音视频 URL
+function extractDouyinVideoUrl(input) {
+  const text = input.trim();
+  // 1. 优先提取 https:// 开头的链接
+  const urlMatch = text.match(/https?:\/\/[^\s，。,]+/);
+  if (urlMatch) return urlMatch[0].replace(/[）)>》\]]+$/, '');
+  // 2. 识别不带 https:// 的短链（如 v.douyin.com/xxx）
+  const shortMatch = text.match(/(?:v\.douyin\.com|www\.douyin\.com)\/[^\s，。,]+/);
+  if (shortMatch) return 'https://' + shortMatch[0].replace(/[）)>》\]]+$/, '');
+  return '';
+}
+
 // 拉取单个抖音视频的真实文案（字幕优先，无字幕降级用描述）
 async function fetchVideoScript(url, tikhubKey) {
   const videoResponse = await fetch(
@@ -421,7 +433,12 @@ router.post('/learning/analyze', requireAuth, async (req, res) => {
 
     /* ── 单个视频：拉真实字幕 → AI 提炼结构规律 ── */
     if (type === 'video') {
-      const v = await fetchVideoScript(url, tikhubKey);
+      // 从用户输入中提取真实 URL（支持分享文本/短链/完整链接）
+      const realUrl = extractDouyinVideoUrl(url);
+      if (!realUrl) {
+        return res.status(422).json({ code: 422, msg: '未识别到有效的视频链接。请直接粘贴视频 URL（如 https://v.douyin.com/xxx），或复制视频分享文本（会自动提取链接）' });
+      }
+      const v = await fetchVideoScript(realUrl, tikhubKey);
       if (!v.script.trim()) return res.status(422).json({ code: 422, msg: '该视频未提取到文案内容（可能无口播/无字幕）' });
 
       const prompt = `你是资深短视频口播文案分析师。下面是一条抖音视频的真实文案（口播字幕）：
@@ -435,9 +452,11 @@ ${v.script.slice(0, 1500)}
     }
 
     /* ── 账号主页：拉真实近期视频 → AI 归纳高频规律 ── */
-    const secUserId = extractSecUserId(url);
+    // 先尝试从分享文本中提取 URL
+    const accountRealUrl = extractDouyinVideoUrl(url) || url;
+    const secUserId = extractSecUserId(accountRealUrl);
     if (!secUserId) {
-      return res.status(422).json({ code: 422, msg: '请粘贴抖音账号主页链接（形如 douyin.com/user/MS4...），短链请先在浏览器打开取完整主页地址' });
+      return res.status(422).json({ code: 422, msg: '未识别到账号主页链接。请打开抖音 → 进入对方主页 → 点右上角分享 → 复制链接，再粘贴到这里' });
     }
 
     const videos = await fetchUserRecentVideos(secUserId, tikhubKey, 20);

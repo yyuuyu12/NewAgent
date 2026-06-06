@@ -1734,6 +1734,35 @@ function tTopBar() {
     const loginHint = !getToken() ? `<span class="top-bar-login" onclick="openAuthSheet()">登录</span>` : '';
     return `<div class="top-bar"><span class="app-name">爆款文案工坊</span>${loginHint}</div>`;
   }
+  // ── 原创工坊：统一的子页头（单返回按钮）──
+  if (t === 'original') {
+    const v = S.originalView;
+    const backBtn = (action) => `<button type="button" class="back-btn" onclick="${action}" aria-label="返回"><svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+    const ver = (S.originalSkill && S.originalSkill.version) ? S.originalSkill.version : 'v1.0';
+    if (v === 'chat' && S.originalProject) {
+      const p = S.originalProject;
+      const isFinal = p.status === 'final';
+      return `<div class="top-bar top-bar-sub">
+        ${backBtn("setState({originalView:'home'});render()")}
+        <div style="flex:1;min-width:0;text-align:left;padding:0 8px">
+          <div style="font-size:15px;font-weight:700;color:#1A1614;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.title)}</div>
+          <div style="font-size:11px;color:#9E9890;margin-top:1px">Skill ${esc(ver)} · ${p.turns||0} 轮</div>
+        </div>
+        <span style="flex-shrink:0;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${isFinal?'#F0FDF4':'#FFF3E8'};color:${isFinal?'#059669':'#F5602A'}">${isFinal?'已定稿':'草稿'}</span>
+      </div>`;
+    }
+    const titles = { skill: '我的 Skill', learning: '学习中心', new: '新建项目', home: '原创工坊' };
+    const back = v === 'home' ? "setState({currentTab:'home'});render()" : "setState({originalView:'home'});render()";
+    let right = '<div style="width:36px;flex-shrink:0"></div>';
+    if (v === 'skill' && S.originalSkill) {
+      right = `<span style="flex-shrink:0;font-size:13px;font-weight:700;color:#C85A10;background:#FFF0E0;border:1px solid #FFD9B8;padding:3px 10px;border-radius:8px">${esc(ver)}</span>`;
+    }
+    return `<div class="top-bar top-bar-sub">
+      ${backBtn(back)}
+      <span class="sub-page-title">${titles[v] || '原创工坊'}</span>
+      ${right}
+    </div>`;
+  }
   // 动态计算子页面标题和返回动作
   let title = '';
   let backAction = "setState({currentTab:'home'});loadTasks();render()";
@@ -2066,6 +2095,8 @@ function tWorkshopBench() {
 }
 
 function tBottomTab() {
+  // 原创工坊·项目对话：隐藏底部导航，给输入框让出空间
+  if (S.currentTab === 'original' && S.originalView === 'chat') return '';
   const tabDef = [
     { key: 'home',     label: '创作', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>` },
     { key: 'agents',   label: '智能体', svg: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M9 11V7a3 3 0 016 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>` },
@@ -7808,143 +7839,155 @@ function tOriginal() {
 function tOriginalHome() {
   const skill = S.originalSkill;
   const projects = S.originalProjects || [];
+  const ver = (skill && skill.version) ? skill.version : 'v1.0';
   const ruleCount = skill ? Object.values(skill.rules||{}).reduce((n,arr)=>n+(arr||[]).length, 0) : 0;
   const kwCount = skill ? (skill.keywords||[]).length : 0;
   const fbCount = skill ? (skill.forbidden||[]).length : 0;
 
-  const projectItems = projects.length === 0
-    ? `<div style="text-align:center;padding:32px 0;color:#aaa;font-size:14px">还没有项目，点击 + 开始创作</div>`
-    : projects.map(p => `
-      <div class="section-card" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;"
-           onclick="openOriginalProject(${p.id})">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:600;color:#1A1614;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
-          <div style="font-size:12px;color:#aaa">${p.turns} 轮对话 · ${p.status === 'final' ? '<span style="color:#22C55E">已定稿</span>' : '<span style="color:#F5762A">创作中</span>'} · ${formatRelTime(p.updated_at)}</div>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>`).join('');
+  // 最近更新行：找最后一条规律的来源
+  let lastNote = '开始对话或学习，逐步沉淀你的专属规律';
+  if (skill && ruleCount > 0) {
+    const allRules = Object.values(skill.rules||{}).flat();
+    const last = allRules[allRules.length - 1];
+    if (last && last.text) lastNote = `最近更新：${esc(last.source || '同步')} · 「${esc(last.text.slice(0,12))}${last.text.length>12?'…':''}」`;
+  }
 
-  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh">
-    <div class="top-bar top-bar-sub">
-      <button type="button" class="back-btn" onclick="setState({currentTab:'home'});render()" aria-label="返回">
-        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <span class="sub-page-title">原创工坊</span>
-      <div style="width:36px;flex-shrink:0"></div>
+  const stat = (n, label) => `<div style="font-size:12px;color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:5px"><div style="width:4px;height:4px;border-radius:50%;background:#FFB877"></div>${n} ${label}</div>`;
+
+  const projectCards = projects.map(p => {
+    const isFinal = p.status === 'final';
+    return `<div class="card" onclick="openOriginalProject(${p.id})" style="padding:15px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:38px;height:38px;border-radius:11px;background:${isFinal?'#F0FDF4':'#FFF3E8'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${isFinal?'#059669':'#F5602A'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:#1A1614;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+            <span style="font-size:11px;color:#B0AA9F">${formatRelTime(p.updated_at)}</span>
+            <span style="font-size:11px;color:#B0AA9F">· ${p.turns||0} 轮</span>
+          </div>
+        </div>
+        <span style="flex-shrink:0;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${isFinal?'#F0FDF4':'#FFF3E8'};color:${isFinal?'#059669':'#F5602A'}">${isFinal?'已定稿':'草稿'}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 24px">
+    <!-- Skill 暗色卡 -->
+    <div onclick="setState({originalView:'skill'});render()" style="margin:0 16px 14px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);border-radius:22px;padding:18px 20px;cursor:pointer;position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent">
+      <div style="position:absolute;top:-25px;right:-15px;width:120px;height:120px;border-radius:50%;background:rgba(255,184,119,0.06)"></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;position:relative">
+        <div>
+          <div style="font-size:10.5px;color:rgba(255,255,255,0.45);letter-spacing:0.5px;margin-bottom:5px">全局唯一 · 蒸馏的你自己</div>
+          <div style="font-size:18px;font-weight:700;color:#fff">我的 Skill</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:12px;font-weight:700;color:#FFB877;background:rgba(255,184,119,0.15);border:1px solid rgba(255,184,119,0.3);padding:3px 9px;border-radius:8px">${esc(ver)}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px;margin-bottom:12px;position:relative">
+        ${stat(ruleCount,'条规则')}${stat(kwCount,'个高频词')}${stat(fbCount,'条禁区')}
+      </div>
+      <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:11px;font-size:11.5px;color:rgba(255,255,255,0.38);position:relative">${lastNote}</div>
     </div>
-    <div style="padding:14px 16px 0">
-      <!-- Skill 卡 -->
-      <div onclick="setState({originalView:'skill'});render()"
-           style="background:linear-gradient(135deg,#2A2320 0%,#3D2E28 50%,#1A1614 100%);border-radius:18px;padding:20px;color:#fff;cursor:pointer;position:relative;overflow:hidden;margin-bottom:12px;-webkit-tap-highlight-color:transparent;">
-        <div style="position:absolute;right:-20px;top:-20px;width:120px;height:120px;border-radius:50%;background:rgba(245,118,42,0.12)"></div>
-        <div style="position:absolute;right:20px;bottom:-30px;width:80px;height:80px;border-radius:50%;background:rgba(245,118,42,0.08)"></div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;position:relative">
-          <div style="width:32px;height:32px;border-radius:10px;background:rgba(245,118,42,0.25);display:flex;align-items:center;justify-content:center">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          </div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#fff">我的 Skill 文档</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:1px">${skill ? 'v' + skill.version : '未初始化'}</div>
-          </div>
-          <div style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;color:rgba(255,255,255,0.5)">
-            查看 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
+
+    <!-- 学习中心入口 -->
+    <div onclick="setState({originalView:'learning',originalLearningResult:null});render()" style="margin:0 16px 18px;background:#FAF7F3;border:1.5px dashed #E8D8C4;border-radius:16px;padding:13px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;-webkit-tap-highlight-color:transparent">
+      <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#FFB877"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8L12 2z"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:700;color:#1A1614">学习中心</div>
+        <div style="font-size:12px;color:#9E9890;margin-top:2px">拆解账号或视频规律，写进 Skill 或仅用于本项目</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C0B8B0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+
+    <!-- 我的项目 -->
+    <div style="padding:0 22px 12px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:17px;font-weight:700;color:#1A1614;letter-spacing:-0.3px">我的项目</span>
+      <span style="font-size:13px;color:#9E9890">${projects.length} 个</span>
+    </div>
+    <div style="padding:0 16px;display:flex;flex-direction:column;gap:10px">
+      <div onclick="setState({originalView:'new',originalNewTitle:'',originalNewBrief:''});render()" style="border:1.5px dashed #D8D2C9;border-radius:14px;padding:14px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;-webkit-tap-highlight-color:transparent">
+        <div style="width:32px;height:32px;border-radius:10px;background:#FFF3E8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </div>
-        <div style="display:flex;gap:16px;position:relative">
-          <div style="text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#F5762A">${ruleCount}</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">创作规律</div>
-          </div>
-          <div style="text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#fff">${kwCount}</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">高频词</div>
-          </div>
-          <div style="text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#fff">${fbCount}</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">禁区</div>
-          </div>
-          <div style="margin-left:auto;align-self:flex-end">
-            <div onclick="event.stopPropagation();setState({originalView:'learning',originalLearningResult:null});render()"
-                 style="border:1.5px dashed rgba(245,118,42,0.4);border-radius:10px;padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.6);-webkit-tap-highlight-color:transparent;">
-              + 学习中心
-            </div>
-          </div>
-        </div>
+        <span style="font-size:14px;font-weight:600;color:#F5602A">新建项目</span>
       </div>
-      <!-- 项目列表 -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span class="section-title-text" style="font-size:15px;font-weight:700;color:#1A1614">我的项目</span>
-        <button type="button" onclick="setState({originalView:'new',originalNewTitle:'',originalNewBrief:''});render()"
-                style="display:flex;align-items:center;gap:5px;background:#F5762A;color:#fff;border:none;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          新项目
-        </button>
-      </div>
-      <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
-        ${S.originalLoading
-          ? `<div style="text-align:center;padding:32px 0;color:#aaa;font-size:14px">加载中…</div>`
-          : projectItems}
-      </div>
+      ${S.originalLoading
+        ? `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">加载中…</div>`
+        : projectCards}
     </div>
   </div>`;
 }
 
 function tOriginalSkill() {
   const skill = S.originalSkill;
-  if (!skill) return `<div class="page-content"><div class="top-bar top-bar-sub">
-    <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
-      <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <span class="sub-page-title">Skill 文档</span>
-    <div style="width:36px"></div>
-  </div><div style="padding:40px 16px;text-align:center;color:#aaa">暂无数据</div></div>`;
+  if (!skill) return `<div style="background:#FAF9F6;min-height:100%;padding:40px 16px;text-align:center;color:#B0AA9F;font-size:14px">暂无数据</div>`;
 
   const rules = skill.rules || {};
   const keywords = skill.keywords || [];
   const forbidden = skill.forbidden || [];
+  const allRules = Object.values(rules).flat();
 
-  const renderRuleGroup = (groupName, items) => {
-    if (!items || items.length === 0) return '';
-    return `<div style="margin-bottom:16px">
-      <div style="font-size:13px;font-weight:700;color:#F5762A;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        ${esc(groupName)}
-      </div>
-      ${items.map(r => `<div style="background:#FFF7F0;border-radius:10px;padding:10px 12px;margin-bottom:6px;font-size:13px;color:#3D2E28;line-height:1.5">
-        ${esc(typeof r === 'string' ? r : r.text || '')}
-        ${r.source ? `<div style="font-size:11px;color:#aaa;margin-top:4px">来源：${esc(r.source)}</div>` : ''}
-      </div>`).join('')}
+  const sectionHeader = (label) => `
+    <div style="font-size:13px;font-weight:700;color:#6B5F55;letter-spacing:0.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <div style="height:1px;width:16px;background:#D8D2C9"></div>${esc(label)}<div style="flex:1;height:1px;background:#D8D2C9"></div>
     </div>`;
-  };
 
-  const ruleGroups = Object.entries(rules).map(([k, v]) => renderRuleGroup(k, v)).join('');
-
-  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh">
-    <div class="top-bar top-bar-sub">
-      <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
-        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <span class="sub-page-title">Skill 文档</span>
-      <div style="width:36px;flex-shrink:0"></div>
-    </div>
-    <div style="padding:14px 16px 32px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-        <span style="background:#F5762A;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px">v${esc(skill.version||'1.0')}</span>
-        <span style="font-size:12px;color:#aaa">上次更新：${formatRelTime(skill.updated_at)}</span>
+  const ruleGroups = Object.entries(rules).map(([group, items]) => {
+    if (!items || items.length === 0) return '';
+    return `<div style="margin-bottom:28px">
+      ${sectionHeader(group)}
+      <div style="display:flex;flex-direction:column;gap:16px">
+        ${items.map(r => {
+          const text = typeof r === 'string' ? r : (r.text || '');
+          const src = r.source || '';
+          const isProj = r.sourceType === 'project';
+          const uses = (r.uses != null) ? r.uses : 0;
+          return `<div style="display:flex;gap:12px">
+            <div style="font-size:14px;color:#C85A10;margin-top:2px;flex-shrink:0;font-weight:700">·</div>
+            <div style="flex:1">
+              <div style="font-size:14.5px;color:#1A1614;line-height:1.75;margin-bottom:6px">${esc(text)}</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                ${src ? `<span style="font-size:10.5px;padding:2px 8px;border-radius:5px;background:${isProj?'#EEF0FF':'#F0FDF4'};color:${isProj?'#5B5FD9':'#059669'};font-weight:600">${isProj?'项目同步':'养料'} · ${esc(src)}</span>` : ''}
+                <span style="font-size:11px;color:#C0B8B0">使用 ${uses} 次</span>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
       </div>
-      ${ruleGroups || `<div style="padding:24px 0;text-align:center;color:#aaa;font-size:14px">还没有规律，开始创作并同步积累吧</div>`}
+    </div>`;
+  }).join('');
+
+  return `<div style="background:#FAF9F6;min-height:100%;padding:4px 0 32px">
+    <div style="padding:0 26px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:12px;color:#B0AA9F">最后更新 ${formatRelTime(skill.updated_at) || '—'}</span>
+      <span style="color:#D8D2C9">·</span>
+      <span style="font-size:12px;color:#B0AA9F">${allRules.length} 条规则 · ${keywords.length} 个高频词 · ${forbidden.length} 条禁区</span>
+    </div>
+    <div style="padding:0 26px">
+      ${ruleGroups || `<div style="padding:24px 0;text-align:center;color:#B0AA9F;font-size:14px">还没有规律，开始创作并同步积累吧</div>`}
       ${keywords.length > 0 ? `
-        <div style="margin-bottom:16px">
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">高频词</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">
-            ${keywords.map(k=>`<span style="background:#EEF2FF;color:#5B62D8;font-size:12px;padding:4px 10px;border-radius:20px">${esc(k)}</span>`).join('')}
+        <div style="margin-bottom:28px">
+          ${sectionHeader('高频词')}
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${keywords.map(k=>`<span style="font-size:14px;color:#1A1614;background:#FFF3E8;border:1px solid #FFD9B8;padding:5px 14px;border-radius:20px;font-weight:500">${esc(k)}</span>`).join('')}
           </div>
         </div>` : ''}
       ${forbidden.length > 0 ? `
-        <div>
-          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">禁区</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">
-            ${forbidden.map(f=>`<span style="background:#FFF0F0;color:#E53E3E;font-size:12px;padding:4px 10px;border-radius:20px">${esc(f)}</span>`).join('')}
+        <div style="margin-bottom:12px">
+          ${sectionHeader('禁区')}
+          <div style="display:flex;flex-direction:column;gap:10px">
+            ${forbidden.map(f=>`<div style="display:flex;align-items:center;gap:10px">
+              <div style="width:18px;height:18px;border-radius:5px;background:#FFF0F0;border:1px solid #FECACA;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="9" height="9" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="#E5372A" stroke-width="2.2" stroke-linecap="round"/></svg>
+              </div>
+              <span style="font-size:14px;color:#4A3828;line-height:1.6">${esc(f)}</span>
+            </div>`).join('')}
           </div>
         </div>` : ''}
     </div>
@@ -7954,225 +7997,304 @@ function tOriginalSkill() {
 function tOriginalLearning() {
   const result = S.originalLearningResult;
   const loading = S.originalLearningLoading;
-  const type = S.originalLearningType;
-  const scope = S.originalLearningScope;
+  const type = S.originalLearningType || 'account';
+  const scope = S.originalLearningScope || 'global';
+  const url = S.originalLearningUrl || '';
 
-  const resultItems = result && result.length > 0 ? result.map((item, idx) => `
-    <div style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:${item.checked?'#FFF7F0':'#fff'};border-radius:12px;border:1.5px solid ${item.checked?'#F5762A':'#f0f0f0'};margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;"
-         onclick="(function(){S.originalLearningResult[${idx}].checked=!S.originalLearningResult[${idx}].checked;render()})()">
-      <div style="width:20px;height:20px;border-radius:6px;border:2px solid ${item.checked?'#F5762A':'#ddd'};background:${item.checked?'#F5762A':'#fff'};flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px">
-        ${item.checked?'<svg width="11" height="9" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
-      </div>
-      <div style="flex:1">
-        <div style="font-size:12px;font-weight:700;color:#F5762A;margin-bottom:3px">${esc(item.label)}</div>
-        <div style="font-size:13px;color:#3D2E28;line-height:1.5">${esc(item.text)}</div>
-        ${item.source?`<div style="font-size:11px;color:#aaa;margin-top:3px">来源：${esc(item.source)}</div>`:''}
-      </div>
-    </div>`).join('') : '';
+  const seg = (active, label, action) => `<div onclick="${action}" style="flex:1;text-align:center;padding:9px 0;border-radius:11px;font-size:13px;font-weight:${active?700:500};cursor:pointer;transition:all .2s;background:${active?'#fff':'transparent'};color:${active?'#1A1614':'#9E9890'};box-shadow:${active?'0 2px 8px rgba(0,0,0,0.08)':'none'};-webkit-tap-highlight-color:transparent">${label}</div>`;
 
-  const checkedCount = result ? result.filter(r=>r.checked).length : 0;
+  // 结果区
+  let resultBlock = '';
+  if (loading) {
+    resultBlock = `<div style="text-align:center;padding:28px 0;color:#B0AA9F;font-size:14px">正在读取真实内容并提炼规律…</div>`;
+  } else if (result === null) {
+    resultBlock = '';
+  } else if (type === 'video') {
+    const insight = (result && result[0]) ? result[0].text : '';
+    resultBlock = insight ? `
+      <div style="margin:0 0 24px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span style="font-size:14px;font-weight:700;color:#1A1614">单视频规律提取</span>
+        </div>
+        <div style="background:#FAF8F5;border-radius:12px;padding:14px;font-size:13.5px;color:#2A241E;line-height:1.75;border-left:2.5px solid #F5602A;margin-bottom:14px">${esc(insight)}</div>
+        <button type="button" onclick="writeOriginalLearning()" style="width:100%;padding:13px 0;border:none;border-radius:16px;background:linear-gradient(135deg,#FF8040,#F5602A);color:#fff;font-size:15px;font-weight:700;cursor:pointer">${scope==='global'?'写入 Skill（全局生效）':'用于本项目'}</button>
+      </div>` : `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效规律</div>`;
+  } else {
+    // account
+    if (!result || result.length === 0) {
+      resultBlock = `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:14px">未提炼到有效规律</div>`;
+    } else {
+      const checkedCount = result.filter(r=>r.checked).length;
+      const items = result.map((item, idx) => `
+        <div onclick="S.originalLearningResult[${idx}].checked=!S.originalLearningResult[${idx}].checked;render()" style="background:${item.checked?'#FFF8F3':'#fff'};border-radius:12px;padding:13px 14px;border:1.5px solid ${item.checked?'#F5602A':'#F0EDE8'};cursor:pointer;display:flex;align-items:flex-start;gap:11px;transition:all .15s;-webkit-tap-highlight-color:transparent">
+          <div style="width:20px;height:20px;border-radius:6px;border:2px solid ${item.checked?'#F5602A':'#D8D2C9'};background:${item.checked?'#F5602A':'#fff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all .15s">
+            ${item.checked?'<svg width="11" height="9" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13.5px;color:#1A1614;line-height:1.65">${esc(item.text)}</div>
+            ${item.source?`<div style="font-size:11px;color:#B0AA9F;margin-top:4px">${esc(item.source)}</div>`:''}
+          </div>
+        </div>`).join('');
+      resultBlock = `
+        <div style="margin:0 0 24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span style="font-size:14px;font-weight:700;color:#1A1614">发现 ${result.length} 条规律</span>
+            </div>
+            <span style="font-size:12px;color:#B0AA9F">已选 ${checkedCount} 条</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">${items}</div>
+          <button type="button" ${checkedCount===0?'disabled':''} onclick="writeOriginalLearning()" style="width:100%;padding:13px 0;border:none;border-radius:16px;background:${checkedCount===0?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${checkedCount===0?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${checkedCount===0?'default':'pointer'}">${scope==='global'?`写入 Skill（${checkedCount} 条）`:`用于本项目（${checkedCount} 条）`}</button>
+        </div>`;
+    }
+  }
 
-  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh">
-    <div class="top-bar top-bar-sub">
-      <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
-        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <span class="sub-page-title">学习中心</span>
-      <div style="width:36px;flex-shrink:0"></div>
+  return `<div style="background:#F7F5F1;min-height:100%;padding:14px 0 28px">
+    <!-- 范围切换 -->
+    <div style="display:flex;background:#EDE9E3;border-radius:13px;padding:3px;margin:0 22px 12px">
+      ${seg(scope==='global','写入全局 Skill',"setState({originalLearningScope:'global'});render()")}
+      ${seg(scope==='project','仅用于本项目',"setState({originalLearningScope:'project'});render()")}
     </div>
-    <div style="padding:14px 16px 32px">
-      <!-- 范围切换 -->
-      <div style="display:flex;background:#fff;border-radius:12px;padding:4px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
-        <div onclick="setState({originalLearningScope:'global'});render()"
-             style="flex:1;text-align:center;padding:8px 0;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;${scope==='global'?'background:#F5762A;color:#fff;':'color:#999;'}">
-          全局通用
-        </div>
-        <div onclick="setState({originalLearningScope:'project'});render()"
-             style="flex:1;text-align:center;padding:8px 0;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;${scope==='project'?'background:#F5762A;color:#fff;':'color:#999;'}">
-          当前项目
-        </div>
-      </div>
-      <!-- 类型切换 -->
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <div onclick="setState({originalLearningType:'account'});render()"
-             style="flex:1;text-align:center;padding:9px 0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:2px solid ${type==='account'?'#F5762A':'#e8e8e8'};background:${type==='account'?'#FFF7F0':'#fff'};color:${type==='account'?'#F5762A':'#999'};">
-          账号分析
-        </div>
-        <div onclick="setState({originalLearningType:'video'});render()"
-             style="flex:1;text-align:center;padding:9px 0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:2px solid ${type==='video'?'#F5762A':'#e8e8e8'};background:${type==='video'?'#FFF7F0':'#fff'};color:${type==='video'?'#F5762A':'#999'};">
-          视频分析
-        </div>
-      </div>
-      <!-- URL输入 -->
-      <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
-        <div style="font-size:13px;color:#888;margin-bottom:8px">粘贴${type==='account'?'账号主页':'视频'}链接</div>
-        <textarea id="learning-url-input" rows="2"
-          oninput="S.originalLearningUrl=this.value"
-          style="width:100%;border:1.5px solid #f0f0f0;border-radius:10px;padding:10px 12px;font-size:13px;color:#1A1614;resize:none;outline:none;box-sizing:border-box;background:#FAFAFA;font-family:inherit"
-          placeholder="https://...">${esc(S.originalLearningUrl)}</textarea>
-      </div>
-      <button type="button" onclick="analyzeOriginalLearning()"
-              style="width:100%;padding:13px 0;border:none;border-radius:14px;background:#F5762A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:16px;${loading?'opacity:0.6;':''}">
-        ${loading ? '分析中…' : '分析 · 10 积分'}
-      </button>
-      ${result === null ? `
-        <div style="text-align:center;padding:24px 0">
-          <div style="font-size:28px;margin-bottom:8px">🔍</div>
-          <div style="font-size:14px;color:#aaa">输入链接后点击分析<br>AI 会提炼创作规律</div>
-        </div>` : result.length === 0 ? `
-        <div style="text-align:center;padding:24px 0;color:#aaa;font-size:14px">未提炼到有效规律</div>` : `
-        <div style="font-size:14px;font-weight:700;color:#1A1614;margin-bottom:10px">提炼到 ${result.length} 条规律（选择要写入的）</div>
-        ${resultItems}
-        ${checkedCount > 0 ? `
-          <button type="button" onclick="writeOriginalLearning()"
-                  style="width:100%;padding:13px 0;border:none;border-radius:14px;background:#1A1614;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px">
-            写入 Skill · 已选 ${checkedCount} 条
-          </button>` : ''}`}
+    <div style="margin:0 22px 16px;padding:9px 14px;background:${scope==='global'?'#FFF3E8':'#F0FDF4'};border-radius:12px;font-size:12px;color:${scope==='global'?'#9A3D0C':'#065F46'};line-height:1.6">
+      ${scope==='global'?'学到的规律将写入 Skill，对所有项目长期生效':'学到的规律仅用于当前项目，不改变全局 Skill'}
     </div>
+    <!-- 类型切换 -->
+    <div style="display:flex;background:#EDE9E3;border-radius:13px;padding:3px;margin:0 22px 14px">
+      ${seg(type==='account','账号主页',"setState({originalLearningType:'account',originalLearningResult:null});render()")}
+      ${seg(type==='video','单个视频',"setState({originalLearningType:'video',originalLearningResult:null});render()")}
+    </div>
+    <!-- 输入 -->
+    <div style="margin:0 22px 16px">
+      <div style="font-size:13px;color:#6E6860;font-weight:600;margin-bottom:8px">${type==='account'?'输入账号主页链接（将分析最近多条视频）':'输入单个视频链接'}</div>
+      <div style="background:#fff;border-radius:14px;border:1.5px solid ${url?'#F5602A':'#EDE9E3'};padding:12px 14px;transition:border-color .2s">
+        <textarea id="learning-url-input" oninput="S.originalLearningUrl=this.value"
+          placeholder="${type==='account'?'例如：https://www.douyin.com/user/xxx':'例如：https://v.douyin.com/xxx'}"
+          style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:52px;line-height:1.6;box-sizing:border-box">${esc(url)}</textarea>
+      </div>
+    </div>
+    <button type="button" ${(!url.trim()||loading)?'disabled':''} onclick="analyzeOriginalLearning()"
+            style="width:calc(100% - 44px);margin:0 22px 16px;padding:14px 0;border:none;border-radius:16px;background:${(!url.trim()||loading)?'#E8E4DF':'linear-gradient(135deg,#FF8040,#F5602A)'};color:${(!url.trim()||loading)?'#B0AA9F':'#fff'};font-size:15px;font-weight:700;cursor:${(!url.trim()||loading)?'default':'pointer'}">
+      ${loading ? '分析中…' : (type==='account'?'分析账号文案规律':'提取视频规律')}
+    </button>
+    <div style="padding:0 22px">${resultBlock}</div>
   </div>`;
 }
 
 function tOriginalNew() {
   const skill = S.originalSkill;
   const loading = S.originalLoading;
-  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh">
-    <div class="top-bar top-bar-sub">
-      <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
-        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <span class="sub-page-title">新建项目</span>
-      <div style="width:36px;flex-shrink:0"></div>
+  const ver = (skill && skill.version) ? skill.version : 'v1.0';
+  const ruleCount = skill ? Object.values(skill.rules || {}).flat().length : 0;
+  const title = S.originalNewTitle || '';
+  const brief = S.originalNewBrief || '';
+  const canCreate = !!title.trim() && !loading;
+
+  return `<div style="background:#F7F5F1;min-height:100%;padding:0 0 28px">
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 14px;padding:18px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:8px">项目标题（这条视频在讲什么）</div>
+      <input type="text" id="orig-new-title" oninput="S.originalNewTitle=this.value;_origNewUnderline()"
+        value="${esc(title)}" placeholder="例如：我用3天做了个AI工具"
+        style="width:100%;border:none;outline:none;font-size:15.5px;font-weight:600;color:#1A1614;background:transparent;font-family:inherit;padding:4px 0;box-sizing:border-box" />
+      <div id="orig-new-title-line" style="height:2px;background:${title?'#F5602A':'#F0EDE8'};margin-top:8px;border-radius:1px;transition:background .2s"></div>
     </div>
-    <div style="padding:14px 16px 32px">
-      <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
-        <div style="font-size:13px;color:#888;margin-bottom:6px;font-weight:600">视频主题 <span style="color:#E53E3E">*</span></div>
-        <input type="text" id="orig-new-title"
-          oninput="S.originalNewTitle=this.value"
-          value="${esc(S.originalNewTitle)}"
-          placeholder="例如：职场穿搭 / 副业变现 / 宝宝辅食"
-          style="width:100%;border:1.5px solid #f0f0f0;border-radius:10px;padding:10px 12px;font-size:14px;color:#1A1614;outline:none;box-sizing:border-box;font-family:inherit" />
-        <div style="font-size:13px;color:#888;margin:14px 0 6px;font-weight:600">创作目标 <span style="color:#999;font-weight:400;font-size:12px">（选填）</span></div>
-        <textarea id="orig-new-brief" rows="3"
-          oninput="S.originalNewBrief=this.value"
-          placeholder="这条视频想传达什么？目标受众是谁？有什么特别的要求？"
-          style="width:100%;border:1.5px solid #f0f0f0;border-radius:10px;padding:10px 12px;font-size:13px;color:#1A1614;resize:none;outline:none;box-sizing:border-box;font-family:inherit;line-height:1.6">${esc(S.originalNewBrief)}</textarea>
-      </div>
-      ${skill ? `
-        <div style="background:linear-gradient(135deg,#2A2320,#3D2E28);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
-          <div style="width:32px;height:32px;border-radius:10px;background:rgba(245,118,42,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          </div>
-          <div>
-            <div style="font-size:12px;font-weight:700;color:#F5762A">Skill 文档已加载</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">v${esc(skill.version||'1.0')} · AI 将根据你的风格规律创作</div>
-          </div>
-        </div>` : ''}
-      <button type="button" onclick="createOriginalProject()"
-              style="width:100%;padding:14px 0;border:none;border-radius:14px;background:#F5762A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;${loading?'opacity:0.6;':''}">
-        ${loading ? '创建中…' : '开始创作 · 5 积分'}
-      </button>
+    <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 14px;padding:18px">
+      <div style="font-size:12px;color:#9E9890;margin-bottom:8px">想传达什么（可选）</div>
+      <textarea id="orig-new-brief" oninput="S.originalNewBrief=this.value;_origNewUnderline()"
+        placeholder="例如：让普通上班族知道AI工具其实不难用…"
+        style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit;resize:none;height:60px;line-height:1.65;box-sizing:border-box">${esc(brief)}</textarea>
+      <div id="orig-new-brief-line" style="height:2px;background:${brief?'#F5602A':'#F0EDE8'};margin-top:8px;border-radius:1px;transition:background .2s"></div>
     </div>
+    ${skill ? `
+      <div style="background:#fff;border-radius:20px;box-shadow:0 4px 16px rgba(0,0,0,0.05);margin:0 22px 24px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+        <div style="width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFB877" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13.5px;font-weight:600;color:#1A1614">自动加载 Skill ${esc(ver)}</div>
+          <div style="font-size:11.5px;color:#9E9890;margin-top:1px">${ruleCount} 条规则已就绪，开始对话即可</div>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>` : '<div style="height:10px"></div>'}
+    <button type="button" id="orig-new-btn" ${canCreate?'':'disabled'} onclick="createOriginalProject()"
+            style="width:calc(100% - 44px);margin:0 22px;padding:15px 0;border:none;border-radius:16px;background:${canCreate?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};color:${canCreate?'#fff':'#B0AA9F'};font-size:16px;font-weight:700;cursor:${canCreate?'pointer':'default'}">
+      ${loading ? '创建中…' : '开始创作'}
+    </button>
   </div>`;
+}
+
+// 新建项目页：根据输入实时切换下划线 & 按钮高亮（无需整页 render）
+function _origNewUnderline() {
+  const t = (S.originalNewTitle || '').trim();
+  const b = (S.originalNewBrief || '').trim();
+  const tl = document.getElementById('orig-new-title-line');
+  const bl = document.getElementById('orig-new-brief-line');
+  const btn = document.getElementById('orig-new-btn');
+  if (tl) tl.style.background = t ? '#F5602A' : '#F0EDE8';
+  if (bl) bl.style.background = b ? '#F5602A' : '#F0EDE8';
+  if (btn) {
+    const ok = !!t;
+    btn.disabled = !ok;
+    btn.style.background = ok ? 'linear-gradient(135deg,#FF8040,#F5602A)' : '#E8E4DF';
+    btn.style.color = ok ? '#fff' : '#B0AA9F';
+    btn.style.cursor = ok ? 'pointer' : 'default';
+  }
 }
 
 function tOriginalChat() {
   const proj = S.originalProject;
   const messages = S.originalMessages || [];
-  const tab = S.originalChatTab;
+  const tab = S.originalChatTab || 'chat';
   const loading = S.originalLoading;
-  if (!proj) return `<div class="page-content"><div style="padding:80px 16px;text-align:center;color:#aaa">项目数据加载中…</div></div>`;
+  if (!proj) return `<div style="background:#F4F1EC;min-height:100%;padding:80px 16px;text-align:center;color:#B0AA9F">项目数据加载中…</div>`;
+
+  const ver = (S.originalSkill && S.originalSkill.version) ? S.originalSkill.version : 'v1.0';
+  const ruleCount = S.originalSkill ? Object.values(S.originalSkill.rules || {}).flat().length : 0;
+  const aiAvatar = `<div style="width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#1E1A14,#3A2E1E);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFB877" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+  </div>`;
 
   const renderMsg = (msg) => {
-    const isUser = msg.role === 'user';
-    if (isUser) {
-      return `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
-        <div style="max-width:76%;background:#F5762A;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;line-height:1.6">${esc(msg.content)}</div>
+    if (msg.role === 'user') {
+      return `<div style="display:flex;justify-content:flex-end">
+        <div style="max-width:78%;background:#F5602A;border-radius:18px 4px 18px 18px;padding:10px 14px">
+          <div style="font-size:14px;color:#fff;line-height:1.7">${esc(msg.content)}</div>
+        </div>
       </div>`;
     }
-    // AI message — strip 【新文案】block from display, show only the summary part
-    const displayContent = msg.content.replace(/【新文案】[\s\S]*?【\/新文案】/g, '').trim();
-    const syncCard = (msg.sync_label && msg.sync_done !== 'synced' && msg.sync_done !== 'skipped') ? `
-      <div style="margin-top:10px;background:#FFF7F0;border:1.5px solid #FFD9BC;border-radius:12px;padding:10px 12px">
-        <div style="font-size:11px;color:#F5762A;font-weight:700;margin-bottom:4px">💡 提炼到规律</div>
-        <div style="font-size:12px;color:#3D2E28;margin-bottom:8px">${esc(msg.sync_label)}</div>
+    const displayContent = (msg.content || '').replace(/【新文案】[\s\S]*?【\/新文案】/g, '').trim();
+    let syncCard = '';
+    if (msg.sync_done === 'synced') {
+      syncCard = `<div style="margin-top:8px;padding:8px 12px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;display:flex;align-items:center;gap:7px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <span style="font-size:12px;color:#059669;font-weight:600">「${esc(msg.sync_label||'规律')}」已同步到 Skill</span>
+      </div>`;
+    } else if (msg.sync_done === 'skipped') {
+      syncCard = `<div style="margin-top:8px;padding:7px 12px;background:#F9F7F4;border-radius:10px"><span style="font-size:12px;color:#B0AA9F">仅用于本项目，未同步 Skill</span></div>`;
+    } else if (msg.sync_label) {
+      syncCard = `<div style="margin-top:8px;padding:12px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px">
+        <div style="font-size:12px;color:#92400E;line-height:1.6;margin-bottom:10px">
+          <span style="font-weight:700">「${esc(msg.sync_label)}」效果不错</span>，要同步到 Skill 吗？
+          <div style="font-size:11px;color:#B45309;margin-top:1px">同步后所有项目自动应用这条规律</div>
+        </div>
         <div style="display:flex;gap:8px">
-          <button type="button" onclick="syncOriginalRule(${msg.id},'${esc(msg.sync_label)}')"
-                  style="flex:1;padding:6px 0;border:none;border-radius:8px;background:#F5762A;color:#fff;font-size:12px;font-weight:700;cursor:pointer">同步·全局通用</button>
-          <button type="button" onclick="skipOriginalRule(${msg.id})"
-                  style="flex:1;padding:6px 0;border:none;border-radius:8px;background:#f0f0f0;color:#888;font-size:12px;cursor:pointer">跳过</button>
+          <button type="button" onclick="syncOriginalRule(${msg.id},'${esc(msg.sync_label)}')" style="flex:1;padding:8px;background:linear-gradient(135deg,#FF8040,#F5602A);border:none;border-radius:9px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">同步·全局通用</button>
+          <button type="button" onclick="skipOriginalRule(${msg.id})" style="flex:1;padding:8px;background:rgba(0,0,0,0.06);border:none;border-radius:9px;color:#7A6F65;font-size:12px;font-weight:600;cursor:pointer">不同步·仅本项目</button>
         </div>
-      </div>` : (msg.sync_done === 'synced' ? `
-      <div style="margin-top:8px;font-size:11px;color:#22C55E;display:flex;align-items:center;gap:4px">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        已同步到 Skill
-      </div>` : '');
-    return `<div style="display:flex;justify-content:flex-start;margin-bottom:12px">
-      <div style="max-width:84%">
-        <div style="background:#fff;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14px;color:#1A1614;line-height:1.6;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
-          ${displayContent ? esc(displayContent) : '<span style="color:#aaa;font-style:italic">文案已更新，切到「当前文案」查看</span>'}
-          ${msg.has_doc_update ? `<div style="margin-top:6px;font-size:11px;color:#F5762A;display:flex;align-items:center;gap:4px">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            文案已更新
-          </div>` : ''}
-        </div>
+      </div>`;
+    }
+    return `<div style="display:flex;flex-direction:column;align-items:flex-start">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+        ${aiAvatar}<span style="font-size:11px;color:#9E9890;font-weight:600">原创工坊 · Skill ${esc(ver)}</span>
+      </div>
+      <div style="max-width:88%;background:#fff;border-radius:4px 18px 18px 18px;padding:12px 14px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <div style="font-size:13.5px;color:#2A241E;line-height:1.7">${displayContent ? esc(displayContent) : '文案已更新，点下方查看'}</div>
+        ${msg.has_doc_update ? `<div onclick="setState({originalChatTab:'doc'});render()" style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#F5602A;font-weight:600;cursor:pointer;background:#FFF3E8;padding:5px 10px;border-radius:8px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 查看当前文案 ›
+        </div>` : ''}
         ${syncCard}
       </div>
     </div>`;
   };
 
-  const chatView = `<div id="orig-chat-scroll" style="flex:1;overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+  const banner = `<div style="display:flex;justify-content:center">
+    <span style="font-size:11px;color:#9E9890;background:rgba(0,0,0,0.05);padding:4px 13px;border-radius:20px">已加载 Skill ${esc(ver)} · ${ruleCount} 条规则生效</span>
+  </div>`;
+
+  const chatView = `<div id="orig-chat-scroll" style="flex:1;overflow-y:auto;min-height:0;padding:14px 16px;display:flex;flex-direction:column;gap:18px;-webkit-overflow-scrolling:touch">
+    ${banner}
     ${messages.length === 0
-      ? `<div style="text-align:center;padding:32px 0;color:#aaa;font-size:14px">告诉 AI 你想创作什么内容，或者直接提要求修改文案</div>`
+      ? `<div style="text-align:center;padding:24px 0;color:#B0AA9F;font-size:13.5px;line-height:1.7">告诉 AI 你想创作什么内容，<br>或直接提要求修改文案</div>`
       : messages.map(renderMsg).join('')}
-    ${loading ? `<div style="display:flex;justify-content:flex-start;margin-bottom:12px">
-      <div style="background:#fff;border-radius:16px 16px 16px 4px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
-        <div style="display:flex;gap:4px;align-items:center">
-          <div style="width:6px;height:6px;border-radius:50%;background:#F5762A;animation:bounce 1s infinite 0s"></div>
-          <div style="width:6px;height:6px;border-radius:50%;background:#F5762A;animation:bounce 1s infinite 0.2s"></div>
-          <div style="width:6px;height:6px;border-radius:50%;background:#F5762A;animation:bounce 1s infinite 0.4s"></div>
-        </div>
+    ${loading ? `<div style="display:flex;align-items:center;gap:8px">
+      ${aiAvatar}
+      <div style="background:#fff;border-radius:4px 18px 18px 18px;padding:11px 15px;box-shadow:0 2px 8px rgba(0,0,0,0.06);display:flex;gap:5px;align-items:center">
+        <div style="width:6px;height:6px;border-radius:50%;background:#C8C3BC;animation:pulse 1s 0s infinite"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#C8C3BC;animation:pulse 1s 0.25s infinite"></div>
+        <div style="width:6px;height:6px;border-radius:50%;background:#C8C3BC;animation:pulse 1s 0.5s infinite"></div>
       </div>
     </div>` : ''}
+    <div style="height:4px"></div>
   </div>`;
 
-  const docView = `<div style="flex:1;overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
-    ${proj.doc ? `<div style="background:#fff;border-radius:16px;padding:16px;font-size:14px;color:#1A1614;line-height:1.8;white-space:pre-wrap;box-shadow:0 2px 8px rgba(0,0,0,0.04)">${esc(proj.doc)}</div>` : `<div style="text-align:center;padding:48px 0;color:#aaa;font-size:14px">文案还没生成，开始对话让 AI 帮你写吧</div>`}
+  const inputActive = !!(S.originalInput && S.originalInput.trim()) && !loading;
+  const inputBar = `<div style="padding:10px 14px 22px;background:rgba(247,245,241,0.97);border-top:1px solid rgba(0,0,0,0.06);display:flex;gap:8px;align-items:center;flex-shrink:0">
+    <div style="flex:1;background:#fff;border-radius:22px;border:1.5px solid ${inputActive?'#F5602A':'#EDE9E3'};padding:10px 15px;transition:border-color .2s">
+      <input id="orig-chat-input" value="${esc(S.originalInput||'')}" oninput="S.originalInput=this.value;_origChatInputState()" onkeydown="if(event.key==='Enter'){event.preventDefault();sendOriginalMessage()}"
+        placeholder="告诉我想调整什么…" style="width:100%;border:none;outline:none;font-size:14px;color:#1A1614;background:transparent;font-family:inherit" />
+    </div>
+    <div id="orig-chat-send" onclick="sendOriginalMessage()" style="width:44px;height:44px;border-radius:50%;background:${inputActive?'linear-gradient(135deg,#FF8040,#F5602A)':'#E8E4DF'};display:flex;align-items:center;justify-content:center;cursor:${inputActive?'pointer':'default'};flex-shrink:0;transition:all .2s;box-shadow:${inputActive?'0 4px 12px rgba(245,96,42,0.35)':'none'}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="${inputActive?'#fff':'#B0AA9F'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </div>
   </div>`;
 
-  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh;display:flex;flex-direction:column">
-    <div class="top-bar top-bar-sub" style="flex-shrink:0">
-      <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
-        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <span class="sub-page-title" style="font-size:15px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.title)}</span>
-      <div style="width:36px;flex-shrink:0;text-align:right">
-        <span style="font-size:11px;color:${proj.status==='final'?'#22C55E':'#F5762A'};font-weight:600">${proj.status==='final'?'已定稿':'创作中'}</span>
+  const docCopyBtnId = 'orig-doc-copy';
+  const docView = `<div style="flex:1;overflow-y:auto;min-height:0;padding:12px 22px 24px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid #F0EDE8">
+      <div>
+        <div style="font-size:11px;color:#B0AA9F;margin-bottom:2px">当前文案 · 活文档</div>
+        <div style="font-size:12.5px;color:#9E9890">每次对话调整后自动更新</div>
       </div>
+      ${proj.doc ? `<button type="button" id="${docCopyBtnId}" onclick="copyOriginalDoc('${docCopyBtnId}')" style="padding:7px 13px;font-size:12px;display:flex;align-items:center;gap:5px;color:#6E6860;background:#fff;border:1px solid #F0EDE8;border-radius:12px;cursor:pointer">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>复制
+      </button>` : ''}
     </div>
-    <!-- Tab 切换 -->
-    <div style="display:flex;background:#fff;border-bottom:1px solid #f0f0f0;flex-shrink:0">
-      <div onclick="setState({originalChatTab:'chat'});render()"
-           style="flex:1;text-align:center;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;border-bottom:2.5px solid ${tab==='chat'?'#F5762A':'transparent'};color:${tab==='chat'?'#F5762A':'#aaa'};transition:all 0.18s">
-        对话
-      </div>
-      <div onclick="setState({originalChatTab:'doc'});render()"
-           style="flex:1;text-align:center;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;border-bottom:2.5px solid ${tab==='doc'?'#F5762A':'transparent'};color:${tab==='doc'?'#F5762A':'#aaa'};transition:all 0.18s">
-        当前文案${proj.doc?` <span style="font-size:10px;background:#F5762A;color:#fff;border-radius:6px;padding:1px 5px">已更新</span>`:''}
-      </div>
-    </div>
-    ${tab === 'chat' ? chatView : docView}
-    <!-- 输入框 -->
-    ${tab === 'chat' ? `<div style="padding:10px 14px 20px;background:#fff;border-top:1px solid #f0f0f0;flex-shrink:0;display:flex;gap:10px;align-items:flex-end">
-      <textarea id="orig-chat-input" rows="1"
-        oninput="S.originalInput=this.value;this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
-        placeholder="说说你想怎么改，或者描述这条视频的内容…"
-        style="flex:1;border:1.5px solid #f0f0f0;border-radius:12px;padding:9px 12px;font-size:14px;resize:none;outline:none;background:#FAFAFA;font-family:inherit;line-height:1.5;max-height:100px;overflow-y:auto">${esc(S.originalInput)}</textarea>
-      <button type="button" onclick="sendOriginalMessage()"
-              style="width:40px;height:40px;flex-shrink:0;border:none;border-radius:12px;background:${loading||!S.originalInput.trim()?'#f0f0f0':'#F5762A'};display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.18s">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${loading||!S.originalInput.trim()?'#bbb':'#fff'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      </button>
-    </div>` : ''}
+    ${proj.doc
+      ? `<div style="font-size:15px;color:#1A1614;line-height:2;white-space:pre-line;letter-spacing:0.01em;padding:4px 0">${esc(proj.doc)}</div>
+         <div style="padding-top:12px;border-top:1px solid #F0EDE8;display:flex;align-items:center;gap:8px">
+           <span style="font-size:11px;color:#B0AA9F">最后更新：对话第 ${proj.turns||0} 轮</span>
+         </div>`
+      : `<div style="text-align:center;padding:48px 0;color:#B0AA9F;font-size:14px">文案还没生成，<br>开始对话让 AI 帮你写吧</div>`}
   </div>`;
+
+  const pill = (id, label, badge) => `<div onclick="setState({originalChatTab:'${id}'});render()" style="padding:8px 18px;border-radius:22px;font-size:13px;font-weight:${tab===id?700:500};background:${tab===id?'#fff':'transparent'};color:${tab===id?'#1A1614':'#9E9890'};cursor:pointer;box-shadow:${tab===id?'0 2px 8px rgba(0,0,0,0.1)':'none'};transition:all .2s">${label}${badge||''}</div>`;
+
+  return `<div style="background:#F4F1EC;height:100%;display:flex;flex-direction:column">
+    <div style="display:flex;gap:6px;padding:6px 22px 10px;flex-shrink:0">
+      ${pill('doc','当前文案', proj.doc?` <span style="font-size:9px;background:#F5602A;color:#fff;border-radius:6px;padding:1px 5px;vertical-align:middle">新</span>`:'')}
+      ${pill('chat','对话调整')}
+    </div>
+    ${tab === 'doc' ? docView : chatView}
+    ${tab === 'chat' ? inputBar : ''}
+  </div>`;
+}
+
+// 聊天输入态：实时切换发送按钮高亮（避免整页 render 丢失焦点）
+function _origChatInputState() {
+  const active = !!(S.originalInput && S.originalInput.trim()) && !S.originalLoading;
+  const send = document.getElementById('orig-chat-send');
+  const inputEl = document.getElementById('orig-chat-input');
+  if (send) {
+    send.style.background = active ? 'linear-gradient(135deg,#FF8040,#F5602A)' : '#E8E4DF';
+    send.style.cursor = active ? 'pointer' : 'default';
+    send.style.boxShadow = active ? '0 4px 12px rgba(245,96,42,0.35)' : 'none';
+    const path = send.querySelector('svg');
+    if (path) path.setAttribute('stroke', active ? '#fff' : '#B0AA9F');
+  }
+  if (inputEl) {
+    const wrap = inputEl.parentElement;
+    if (wrap) wrap.style.borderColor = (S.originalInput && S.originalInput.trim()) ? '#F5602A' : '#EDE9E3';
+  }
+}
+
+async function copyOriginalDoc(btnId) {
+  const doc = (S.originalProject && S.originalProject.doc) || '';
+  if (!doc) return;
+  try {
+    await navigator.clipboard.writeText(doc);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = doc; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch {}
+    document.body.removeChild(ta);
+  }
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>已复制';
+    btn.style.color = '#22C55E'; btn.style.borderColor = '#BBF0CC';
+    setTimeout(() => { const b = document.getElementById(btnId); if (b) render(); }, 1400);
+  }
 }
 
 async function openOriginalProject(id) {

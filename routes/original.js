@@ -7,18 +7,68 @@ const router = express.Router();
 
 /* ─────────── 工具函数 ─────────── */
 
-// 扣积分（不足时不阻断，只记录，由前端控制提示）
-async function deductCredits(userId, amount, action) {
-  try {
-    await db.query(
-      'UPDATE cw_user_credits SET credits = GREATEST(0, credits - ?) WHERE user_id = ?',
-      [amount, userId]
-    );
-    await db.query(
-      'INSERT INTO cw_credit_logs (user_id, amount, action, note) VALUES (?, ?, ?, ?)',
-      [userId, -amount, action, '原创工坊']
-    );
-  } catch (_) {}
+// 读取 TikHub API Key（与 extract.js 复用同一配置）
+async function getTikhubKey() {
+  const { rows } = await db.query("SELECT value FROM system_config WHERE config_key = 'tikhub_api_key'");
+  return rows?.[0]?.value || '';
+}
+
+// 拉取单个抖音视频的真实文案（字幕优先，无字幕降级用描述）
+async function fetchVideoScript(url, tikhubKey) {
+  const videoResponse = await fetch(
+    `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_one_video?url=${encodeURIComponent(url.trim())}`,
+    { headers: { Authorization: `Bearer ${tikhubKey}` } }
+  );
+  if (!videoResponse.ok) throw new Error(`视频解析失败: ${await videoResponse.text()}`);
+  const videoData = await videoResponse.json();
+  const item = videoData?.data?.aweme_detail;
+  if (!item) throw new Error('无法获取视频信息，请检查链接是否正确');
+
+  let subtitle = '';
+  const awemeId = item.aweme_id;
+  if (awemeId) {
+    try {
+      const subtitleResp = await fetch(
+        `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_subtitle?aweme_id=${awemeId}`,
+        { headers: { Authorization: `Bearer ${tikhubKey}` } }
+      );
+      if (subtitleResp.ok) {
+        const subData = await subtitleResp.json();
+        const subtitles = subData?.data?.subtitle_infos?.[0]?.subtitle_list;
+        if (subtitles?.length) {
+          subtitle = subtitles.map(s => s.words?.map(w => w.word).join('') || s.text).join('');
+        }
+      }
+    } catch (_) {}
+  }
+  return {
+    script: subtitle || item.desc || '',
+    desc: item.desc || '',
+    likes: item.statistics?.digg_count || 0,
+    author: item.author?.nickname || '',
+  };
+}
+
+// 从抖音主页链接中解析 sec_user_id（形如 douyin.com/user/MS4wLjABAAAA...）
+function extractSecUserId(url) {
+  const m = url.match(/user\/([A-Za-z0-9_-]{20,})/);
+  return m ? m[1] : '';
+}
+
+// 拉取某账号最近的视频列表（真实数据）
+async function fetchUserRecentVideos(secUserId, tikhubKey, count = 20) {
+  const resp = await fetch(
+    `https://api.tikhub.io/api/v1/douyin/web/fetch_user_post_videos?sec_user_id=${encodeURIComponent(secUserId)}&max_cursor=0&count=${count}`,
+    { headers: { Authorization: `Bearer ${tikhubKey}` } }
+  );
+  if (!resp.ok) throw new Error(`账号主页解析失败: ${await resp.text()}`);
+  const data = await resp.json();
+  const list = data?.data?.aweme_list || [];
+  return list.map(v => ({
+    aweme_id: v.aweme_id,
+    desc: v.desc || '',
+    likes: v.statistics?.digg_count || 0,
+  }));
 }
 
 // 获取用户 Skill（不存在则创建空模板）
@@ -308,9 +358,6 @@ ${currentDoc}
     );
     const msgId = ins?.[0]?.id;
 
-    // 扣积分
-    await deductCredits(req.userId, 5, 'original_chat');
-
     // 获取最新项目数据
     const { rows: updated } = await db.query('SELECT * FROM cw_original_projects WHERE id = ?', [projectId]);
 
@@ -340,51 +387,84 @@ ${currentDoc}
 ═══════════════════════════════════════ */
 
 // POST /api/original/learning/analyze
+// 真实拉取抖音内容（TikHub）后由 AI 提炼规律
 router.post('/learning/analyze', requireAuth, async (req, res) => {
   const { url, type = 'account', scope = 'global' } = req.body;
   if (!url?.trim()) return res.status(400).json({ code: 400, msg: '请输入链接' });
 
   try {
-    const prompt = type === 'account'
-      ? `你是短视频文案专家。用户提供了一个抖音账号主页链接：${url}
+    const tikhubKey = await getTikhubKey();
+    if (!tikhubKey) return res.status(503).json({ code: 503, msg: '抖音解析未配置，请联系管理员配置 TikHub Key' });
 
-由于无法直接访问，请根据链接特征和常见短视频运营规律，模拟分析一个典型的短视频博主账号，生成4条可能的文案规律（基于通用爆款规律）。
+    /* ── 单个视频：拉真实字幕 → AI 提炼结构规律 ── */
+    if (type === 'video') {
+      const v = await fetchVideoScript(url, tikhubKey);
+      if (!v.script.trim()) return res.status(422).json({ code: 422, msg: '该视频未提取到文案内容（可能无口播/无字幕）' });
 
-要求：
-1. 规律要具体可执行，不要泛泛而谈
-2. 每条规律20-40字
-3. 用JSON数组格式返回，每条包含 text(规律内容) 和 freq(出现频率描述，如"出现8次")
-4. 例：[{"text":"用反差开场制造预期落差","freq":"出现11次"},...]
-
-请直接返回JSON数组：`
-      : `你是短视频文案专家。用户提供了一个视频链接：${url}
-
-由于无法直接访问，请根据链接特征，基于通用短视频文案规律，分析并提取这个视频可能的文案结构规律。
-
-请返回一段简洁的文案规律分析（50-100字），描述这个视频可能使用的开场钩子、结构节奏和结尾方式。
-直接返回分析文字，不要加标题或格式。`;
-
-    const aiResult = await callAI(prompt, { maxTokens: 600, temperature: 0.7 });
-
-    if (type === 'account') {
-      let insights = [];
-      try {
-        // 尝试解析 JSON
-        const jsonMatch = aiResult.match(/\[[\s\S]*\]/);
-        if (jsonMatch) insights = JSON.parse(jsonMatch[0]);
-      } catch (_) {
-        // 降级：按行解析
-        insights = aiResult.split('\n').filter(l => l.trim()).slice(0, 4).map((l, i) => ({
-          text: l.replace(/^[-•\d.、]\s*/, '').trim(),
-          freq: `出现 ${Math.floor(Math.random() * 8) + 5} 次`
-        }));
-      }
-      await deductCredits(req.userId, 10, 'learning_analyze');
-      res.json({ code: 200, data: { type: 'account', insights } });
-    } else {
-      await deductCredits(req.userId, 10, 'learning_analyze');
-      res.json({ code: 200, data: { type: 'video', insight: aiResult.trim() } });
+      const prompt = `你是资深短视频口播文案分析师。下面是一条抖音视频的真实文案（口播字幕）：
+---
+${v.script.slice(0, 1500)}
+---
+请基于这条真实文案，提炼它的创作规律，重点分析：开场钩子写法、内容结构与节奏、结尾引导方式。
+要求：用一段连贯的中文描述（80-140字），具体到可复用的手法，不要泛泛而谈，不要加标题或编号。`;
+      const aiResult = await callAI(prompt, { maxTokens: 500, temperature: 0.6 });
+      return res.json({ code: 200, data: { type: 'video', insight: aiResult.trim() } });
     }
+
+    /* ── 账号主页：拉真实近期视频 → AI 归纳高频规律 ── */
+    const secUserId = extractSecUserId(url);
+    if (!secUserId) {
+      return res.status(422).json({ code: 422, msg: '请粘贴抖音账号主页链接（形如 douyin.com/user/MS4...），短链请先在浏览器打开取完整主页地址' });
+    }
+
+    const videos = await fetchUserRecentVideos(secUserId, tikhubKey, 20);
+    if (!videos.length) return res.status(422).json({ code: 422, msg: '未获取到该账号的视频，请确认主页链接正确' });
+
+    // 取点赞最高的前 6 条拉取真实字幕，结合标题构成语料
+    const top = videos.slice().sort((a, b) => b.likes - a.likes).slice(0, 6);
+    const subResults = await Promise.allSettled(
+      top.map(v => fetchVideoScript(`https://www.douyin.com/video/${v.aweme_id}`, tikhubKey))
+    );
+    const corpusParts = [];
+    subResults.forEach((r, i) => {
+      if (r.status === 'fulfilled' && r.value.script.trim()) {
+        corpusParts.push(`【视频${i + 1}·赞${top[i].likes}】${r.value.script.slice(0, 400)}`);
+      }
+    });
+    // 字幕不足时，用所有视频标题作为补充语料
+    const descCorpus = videos.filter(v => v.desc).slice(0, 20).map(v => `· ${v.desc}`).join('\n');
+    const corpus = (corpusParts.join('\n\n') + '\n\n【视频标题集】\n' + descCorpus).slice(0, 4000);
+
+    if (!corpus.replace(/[\s【】·]/g, '').trim()) {
+      return res.status(422).json({ code: 422, msg: '该账号视频缺少可分析的文案内容' });
+    }
+
+    const prompt = `你是资深短视频口播文案分析师。下面是某抖音账号近期多条视频的真实文案/标题语料：
+---
+${corpus}
+---
+请归纳这个账号反复出现的创作规律（钩子、结构、用词、结尾等）。
+要求：
+1. 提炼 3-5 条最显著、可复用的规律，每条 15-40 字，具体可执行
+2. 基于语料中真实出现的频次估计每条规律的出现情况
+3. 严格用 JSON 数组返回，每项含 text(规律) 和 freq(如"出现 8 次")，不要输出 JSON 以外的任何内容
+示例：[{"text":"用'你以为X其实Y'制造反差","freq":"出现 9 次"}]`;
+
+    const aiResult = await callAI(prompt, { maxTokens: 700, temperature: 0.5 });
+    let insights = [];
+    try {
+      const jsonMatch = aiResult.match(/\[[\s\S]*\]/);
+      if (jsonMatch) insights = JSON.parse(jsonMatch[0]);
+    } catch (_) {
+      insights = aiResult.split('\n').filter(l => l.trim()).slice(0, 5).map(l => ({
+        text: l.replace(/^[-•\d.、\s]+/, '').replace(/^["「]|["」]$/g, '').trim(),
+        freq: '基于近期视频',
+      })).filter(x => x.text);
+    }
+    insights = (insights || []).filter(x => x && x.text).slice(0, 5);
+    if (!insights.length) return res.status(422).json({ code: 422, msg: '未能提炼到有效规律，请换个账号试试' });
+
+    res.json({ code: 200, data: { type: 'account', insights, analyzedCount: videos.length } });
   } catch (err) {
     console.error('/original/learning/analyze error:', err.message);
     res.status(500).json({ code: 500, msg: err.message });

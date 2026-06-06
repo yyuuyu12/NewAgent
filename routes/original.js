@@ -3,6 +3,7 @@ const express = require('express');
 const db = require('../db');
 const { requireAuth } = require('./auth');
 const { callAI } = require('../lib/callAI');
+const { getAsrUrl, extractMp4Url, asrTranscribe } = require('../lib/asrHelper');
 const router = express.Router();
 
 /* ─────────── 工具函数 ─────────── */
@@ -80,8 +81,8 @@ async function fetchVideoScript(url, tikhubKey) {
   const item = await fetchVideoByAwemeId(awemeId, tikhubKey);
   if (!item) throw new Error('视频信息获取失败，请检查链接是否有效');
 
-  // 拉取字幕
-  let subtitle = '';
+  // 1. 优先用 TikHub 内置字幕
+  let script = '';
   try {
     const subtitleResp = await fetch(
       `https://api.tikhub.io/api/v1/douyin/app/v3/fetch_video_subtitle?aweme_id=${awemeId}`,
@@ -91,13 +92,23 @@ async function fetchVideoScript(url, tikhubKey) {
       const subData = await subtitleResp.json();
       const subtitles = subData?.data?.subtitle_infos?.[0]?.subtitle_list;
       if (subtitles?.length) {
-        subtitle = subtitles.map(s => s.words?.map(w => w.word).join('') || s.text).join('');
+        script = subtitles.map(s => s.words?.map(w => w.word).join('') || s.text).join('');
       }
     }
   } catch {}
 
+  // 2. 无内置字幕 → 发给本地 Whisper ASR 转录
+  if (!script) {
+    const mp4Url = extractMp4Url(item);
+    const asrUrl = await getAsrUrl();
+    if (mp4Url && asrUrl) {
+      console.log(`[Original] TikHub 无字幕，启动 ASR 转录: aweme_id=${awemeId}`);
+      script = await asrTranscribe(mp4Url, asrUrl);
+    }
+  }
+
   return {
-    script: subtitle || item.desc || '',
+    script: script || item.desc || '',
     desc: item.desc || '',
     likes: item.statistics?.digg_count || 0,
     author: item.author?.nickname || '',

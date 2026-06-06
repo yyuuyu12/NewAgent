@@ -806,18 +806,14 @@ input.profile-phone-muted { height: 44px; border-radius: 8px; padding: 0 14px; f
 .feat-clone-tags { display: flex; gap: 8px; flex-wrap: wrap; }
 .feat-clone-tag { font-size: 11px; font-weight: 500; color: #6B6FE0; background: #EEF2FF; border-radius: 8px; padding: 5px 12px; }
 
-/* 原创工坊首页入口卡（深色 hero） */
-.orig-home-card { position: relative; overflow: hidden; background: linear-gradient(135deg,#1E1A14 0%,#3A2E1E 100%); border-radius: 22px; padding: 18px 20px 20px; margin-bottom: 12px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; box-shadow: 0 8px 24px rgba(58,46,30,0.28); transition: transform 0.18s, box-shadow 0.18s; }
-.orig-home-card:active { transform: scale(0.985); box-shadow: 0 4px 14px rgba(58,46,30,0.22); }
-.orig-home-glow { position: absolute; top: -36px; right: -24px; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, rgba(255,184,119,0.16) 0%, rgba(255,184,119,0) 70%); pointer-events: none; }
-.orig-home-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
-.orig-home-icon { width: 46px; height: 46px; border-radius: 14px; background: rgba(255,184,119,0.14); border: 1px solid rgba(255,184,119,0.22); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.orig-home-arrow { margin-top: 4px; }
-.orig-home-label { font-size: 11px; color: #FFB877; letter-spacing: 0.6px; font-weight: 600; margin-bottom: 5px; position: relative; }
-.orig-home-title { font-size: 19px; font-weight: 700; color: #fff; letter-spacing: -0.3px; margin-bottom: 6px; position: relative; }
-.orig-home-desc { font-size: 12.5px; color: rgba(255,255,255,0.6); line-height: 1.6; margin-bottom: 14px; position: relative; }
-.orig-home-tags { display: flex; gap: 8px; flex-wrap: wrap; position: relative; }
-.orig-home-tag { font-size: 11px; font-weight: 600; color: #FFC894; background: rgba(255,184,119,0.12); border: 1px solid rgba(255,184,119,0.2); border-radius: 8px; padding: 4px 11px; }
+/* 原创工坊首页入口卡（白色，与爆款克隆同款） */
+.orig-home-card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.04); cursor: pointer; user-select: none; margin-bottom: 10px; position: relative; overflow: hidden; -webkit-tap-highlight-color: transparent; transition: transform 0.18s, box-shadow 0.18s; }
+.orig-home-card:active { transform: scale(0.98); box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+.orig-home-icon { width: 52px; height: 52px; background: #FFF0E5; border-radius: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-bottom: 14px; }
+.orig-home-title { font-size: 17px; font-weight: 600; color: #1A1614; margin-bottom: 6px; }
+.orig-home-desc { font-size: 13px; color: #9E9890; line-height: 1.5; margin-bottom: 14px; }
+.orig-home-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+.orig-home-tag { font-size: 11px; font-weight: 500; color: #F5602A; background: #FFF0E5; border-radius: 8px; padding: 5px 12px; }
 
 /* Home 2-col sub cards */
 .feat-sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
@@ -2573,16 +2569,12 @@ function tHome() {
       </div>
     </div>
     <div class="orig-home-card" onclick="enterOriginal()">
-      <div class="orig-home-glow"></div>
-      <div class="orig-home-head">
-        <div class="orig-home-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFB877" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        </div>
-        <svg class="orig-home-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      <div class="feat-clone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+      <div class="orig-home-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F5602A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </div>
-      <div class="orig-home-label">做自己，而不是抄别人</div>
       <div class="orig-home-title">原创工坊</div>
-      <div class="orig-home-desc">沉淀专属 Skill，项目制深度创作，越用越像你自己。</div>
+      <div class="orig-home-desc">打造专属风格，项目制深度创作——做自己，而不是抄别人</div>
       <div class="orig-home-tags">
         <span class="orig-home-tag">Skill 系统</span>
         <span class="orig-home-tag">项目对话</span>

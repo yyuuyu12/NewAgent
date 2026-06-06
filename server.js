@@ -7,8 +7,8 @@ const initDb = require('./initDb');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','DELETE'], allowedHeaders: ['Content-Type','Authorization'] }));
-app.use(express.json({ limit: '5mb' }));
+app.use(cors({ origin: '*', methods: ['GET','POST','PUT','PATCH','DELETE'], allowedHeaders: ['Content-Type','Authorization'] }));
+app.use(express.json({ limit: '12mb' }));
 
 const { router: authRouter } = require('./routes/auth');
 const extractRouter  = require('./routes/extract');
@@ -18,6 +18,7 @@ const historyRouter  = require('./routes/history');
 const { router: creditsRouter } = require('./routes/credits');
 const agentsRouter   = require('./routes/agents');
 const adminRouter    = require('./routes/admin');
+const originalRouter = require('./routes/original');
 
 app.use('/api/auth',    authRouter);
 app.use('/api/extract', extractRouter);
@@ -25,8 +26,9 @@ app.use('/api/rewrite', rewriteRouter);
 app.use('/api/inspire', inspireRouter);
 app.use('/api/history', historyRouter);
 app.use('/api/credits', creditsRouter);
-app.use('/api/agents',  agentsRouter);
-app.use('/api/admin',   adminRouter);
+app.use('/api/agents',   agentsRouter);
+app.use('/api/admin',    adminRouter);
+app.use('/api/original', originalRouter);
 
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0, setHeaders: (res) => { res.set('Cache-Control', 'no-store, no-cache, must-revalidate'); } }));
 app.get('/api/health', (req, res) => res.json({ code: 200, msg: 'ok', time: new Date().toISOString() }));

@@ -194,5 +194,51 @@ module.exports = async function initDb() {
     console.log('[DB] 已预置 6 个轻量小工具');
   }
 
+  // ── 原创工坊：Skill 文档 ──────────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_skills (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      user_id    INT NOT NULL UNIQUE,
+      version    VARCHAR(20) DEFAULT 'v1.0',
+      rules      JSON DEFAULT ('{}'),
+      keywords   JSON DEFAULT ('[]'),
+      forbidden  JSON DEFAULT ('[]'),
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // ── 原创工坊：项目 ────────────────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_original_projects (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      user_id    INT NOT NULL,
+      title      VARCHAR(255) NOT NULL,
+      brief      TEXT,
+      status     VARCHAR(20) DEFAULT 'draft',
+      doc        LONGTEXT DEFAULT '',
+      turns      INT DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // ── 原创工坊：项目对话消息 ────────────────────────────────────────────────
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS cw_original_messages (
+      id             INT AUTO_INCREMENT PRIMARY KEY,
+      project_id     INT NOT NULL,
+      role           VARCHAR(20) NOT NULL,
+      content        TEXT NOT NULL,
+      has_doc_update TINYINT DEFAULT 0,
+      sync_label     VARCHAR(100) DEFAULT NULL,
+      sync_done      VARCHAR(20) DEFAULT NULL,
+      created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_project (project_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   console.log('[DB] 数据库初始化完成');
 };

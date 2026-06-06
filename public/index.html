@@ -1201,6 +1201,7 @@ const api = {
   get: (path, signal) => apiFetch('GET', path, null, signal),
   post: (path, data, signal) => apiFetch('POST', path, data, signal),
   put: (path, data) => apiFetch('PUT', path, data),
+  patch: (path, data) => apiFetch('PATCH', path, data),
   del: (path) => apiFetch('DELETE', path),
 };
 
@@ -1303,6 +1304,22 @@ const S = {
   workshopView: 'landing', workshopSeg: 'voice', workshopPickedCopy: null,
   // 进阶激活码输入（走 /credits/activate）
   wsCodeInput: '', wsCodeMsg: '', wsCodeOk: false, wsCodeLoading: false,
+  // ===== 原创工坊 =====
+  originalView: 'home',      // 'home'|'skill'|'learning'|'new'|'chat'
+  originalProject: null,     // 当前项目 {id,title,status,turns,doc}
+  originalSkill: null,       // 当前 skill 对象
+  originalProjects: [],      // 项目列表
+  originalMessages: [],      // 当前项目消息列表
+  originalChatTab: 'chat',   // 'chat'|'doc'
+  originalInput: '',
+  originalLoading: false,
+  originalLearningUrl: '',
+  originalLearningType: 'account',  // 'account'|'video'
+  originalLearningScope: 'global',  // 'global'|'project'
+  originalLearningResult: null,     // [{label,text,source,checked}]
+  originalLearningLoading: false,
+  originalNewTitle: '',
+  originalNewBrief: '',
 };
 let inspireController = null;
 let extractController = null;
@@ -1793,6 +1810,7 @@ function tTabContent() {
     case 'history': return tHistory();
     case 'agents':  return tAgents();
     case 'workshop': return tWorkshop();
+    case 'original': return tOriginal();
     default:        return tHome();
   }
 }
@@ -2508,6 +2526,17 @@ function tHome() {
         <div class="feat-sub-icon" style="background:#F0FDF4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11"/><path d="M4 12h9"/><path d="M4 17h6"/><path d="M17 10l3 3-3 3"/><path d="M13 13h7"/></svg></div>
         <div class="feat-sub-title">行业精选</div>
         <div class="feat-sub-desc">按赛道浏览爆款文案合集</div>
+      </div>
+    </div>
+    <div class="feat-clone-card" onclick="enterOriginal()" style="background:linear-gradient(135deg,#FFF7F0 0%,#FFF1E6 100%);border:1.5px solid #FFD9BC;">
+      <div class="feat-clone-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+      <div class="feat-clone-icon" style="background:#FFF0E0"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+      <div class="feat-clone-title" style="color:#D05A00">原创工坊</div>
+      <div class="feat-clone-desc">打造专属风格，项目制深度创作——做自己，而不是抄别人</div>
+      <div class="feat-clone-tags">
+        <span class="feat-clone-tag" style="background:#FFE8D0;color:#C05800">Skill 系统</span>
+        <span class="feat-clone-tag" style="background:#FFE8D0;color:#C05800">项目对话</span>
+        <span class="feat-clone-tag" style="background:#FFE8D0;color:#C05800">同步学习</span>
       </div>
     </div>
     ${tHomeTaskSection()}
@@ -7745,6 +7774,596 @@ async function loadPremiumStatus() {
   } catch {
     setState({ premiumLoaded: true });
   }
+}
+
+// ===== 原创工坊 =====
+
+async function enterOriginal() {
+  if (!getToken()) { setState({ showAuthSheet: true }); render(); return; }
+  setState({ currentTab: 'original', originalView: 'home', originalLoading: true });
+  render();
+  try {
+    const [rSkill, rProj] = await Promise.all([
+      api.get('/original/skill'),
+      api.get('/original/projects'),
+    ]);
+    setState({
+      originalSkill: rSkill.code === 200 ? rSkill.data : null,
+      originalProjects: rProj.code === 200 ? rProj.data : [],
+      originalLoading: false,
+    });
+  } catch { setState({ originalLoading: false }); }
+  render();
+}
+
+function tOriginal() {
+  const v = S.originalView;
+  if (v === 'skill')    return tOriginalSkill();
+  if (v === 'learning') return tOriginalLearning();
+  if (v === 'new')      return tOriginalNew();
+  if (v === 'chat')     return tOriginalChat();
+  return tOriginalHome();
+}
+
+function tOriginalHome() {
+  const skill = S.originalSkill;
+  const projects = S.originalProjects || [];
+  const ruleCount = skill ? Object.values(skill.rules||{}).reduce((n,arr)=>n+(arr||[]).length, 0) : 0;
+  const kwCount = skill ? (skill.keywords||[]).length : 0;
+  const fbCount = skill ? (skill.forbidden||[]).length : 0;
+
+  const projectItems = projects.length === 0
+    ? `<div style="text-align:center;padding:32px 0;color:#aaa;font-size:14px">还没有项目，点击 + 开始创作</div>`
+    : projects.map(p => `
+      <div class="section-card" style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;-webkit-tap-highlight-color:transparent;"
+           onclick="openOriginalProject(${p.id})">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:600;color:#1A1614;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.title)}</div>
+          <div style="font-size:12px;color:#aaa">${p.turns} 轮对话 · ${p.status === 'final' ? '<span style="color:#22C55E">已定稿</span>' : '<span style="color:#F5762A">创作中</span>'} · ${formatRelTime(p.updated_at)}</div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>`).join('');
+
+  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh">
+    <div class="top-bar top-bar-sub">
+      <button type="button" class="back-btn" onclick="setState({currentTab:'home'});render()" aria-label="返回">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="sub-page-title">原创工坊</span>
+      <div style="width:36px;flex-shrink:0"></div>
+    </div>
+    <div style="padding:14px 16px 0">
+      <!-- Skill 卡 -->
+      <div onclick="setState({originalView:'skill'});render()"
+           style="background:linear-gradient(135deg,#2A2320 0%,#3D2E28 50%,#1A1614 100%);border-radius:18px;padding:20px;color:#fff;cursor:pointer;position:relative;overflow:hidden;margin-bottom:12px;-webkit-tap-highlight-color:transparent;">
+        <div style="position:absolute;right:-20px;top:-20px;width:120px;height:120px;border-radius:50%;background:rgba(245,118,42,0.12)"></div>
+        <div style="position:absolute;right:20px;bottom:-30px;width:80px;height:80px;border-radius:50%;background:rgba(245,118,42,0.08)"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;position:relative">
+          <div style="width:32px;height:32px;border-radius:10px;background:rgba(245,118,42,0.25);display:flex;align-items:center;justify-content:center">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#fff">我的 Skill 文档</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:1px">${skill ? 'v' + skill.version : '未初始化'}</div>
+          </div>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;color:rgba(255,255,255,0.5)">
+            查看 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;position:relative">
+          <div style="text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#F5762A">${ruleCount}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">创作规律</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#fff">${kwCount}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">高频词</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#fff">${fbCount}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">禁区</div>
+          </div>
+          <div style="margin-left:auto;align-self:flex-end">
+            <div onclick="event.stopPropagation();setState({originalView:'learning',originalLearningResult:null});render()"
+                 style="border:1.5px dashed rgba(245,118,42,0.4);border-radius:10px;padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.6);-webkit-tap-highlight-color:transparent;">
+              + 学习中心
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 项目列表 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span class="section-title-text" style="font-size:15px;font-weight:700;color:#1A1614">我的项目</span>
+        <button type="button" onclick="setState({originalView:'new',originalNewTitle:'',originalNewBrief:''});render()"
+                style="display:flex;align-items:center;gap:5px;background:#F5762A;color:#fff;border:none;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          新项目
+        </button>
+      </div>
+      <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        ${S.originalLoading
+          ? `<div style="text-align:center;padding:32px 0;color:#aaa;font-size:14px">加载中…</div>`
+          : projectItems}
+      </div>
+    </div>
+  </div>`;
+}
+
+function tOriginalSkill() {
+  const skill = S.originalSkill;
+  if (!skill) return `<div class="page-content"><div class="top-bar top-bar-sub">
+    <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
+      <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <span class="sub-page-title">Skill 文档</span>
+    <div style="width:36px"></div>
+  </div><div style="padding:40px 16px;text-align:center;color:#aaa">暂无数据</div></div>`;
+
+  const rules = skill.rules || {};
+  const keywords = skill.keywords || [];
+  const forbidden = skill.forbidden || [];
+
+  const renderRuleGroup = (groupName, items) => {
+    if (!items || items.length === 0) return '';
+    return `<div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:#F5762A;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        ${esc(groupName)}
+      </div>
+      ${items.map(r => `<div style="background:#FFF7F0;border-radius:10px;padding:10px 12px;margin-bottom:6px;font-size:13px;color:#3D2E28;line-height:1.5">
+        ${esc(typeof r === 'string' ? r : r.text || '')}
+        ${r.source ? `<div style="font-size:11px;color:#aaa;margin-top:4px">来源：${esc(r.source)}</div>` : ''}
+      </div>`).join('')}
+    </div>`;
+  };
+
+  const ruleGroups = Object.entries(rules).map(([k, v]) => renderRuleGroup(k, v)).join('');
+
+  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh">
+    <div class="top-bar top-bar-sub">
+      <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="sub-page-title">Skill 文档</span>
+      <div style="width:36px;flex-shrink:0"></div>
+    </div>
+    <div style="padding:14px 16px 32px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+        <span style="background:#F5762A;color:#fff;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px">v${esc(skill.version||'1.0')}</span>
+        <span style="font-size:12px;color:#aaa">上次更新：${formatRelTime(skill.updated_at)}</span>
+      </div>
+      ${ruleGroups || `<div style="padding:24px 0;text-align:center;color:#aaa;font-size:14px">还没有规律，开始创作并同步积累吧</div>`}
+      ${keywords.length > 0 ? `
+        <div style="margin-bottom:16px">
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">高频词</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${keywords.map(k=>`<span style="background:#EEF2FF;color:#5B62D8;font-size:12px;padding:4px 10px;border-radius:20px">${esc(k)}</span>`).join('')}
+          </div>
+        </div>` : ''}
+      ${forbidden.length > 0 ? `
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1A1614;margin-bottom:8px">禁区</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${forbidden.map(f=>`<span style="background:#FFF0F0;color:#E53E3E;font-size:12px;padding:4px 10px;border-radius:20px">${esc(f)}</span>`).join('')}
+          </div>
+        </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function tOriginalLearning() {
+  const result = S.originalLearningResult;
+  const loading = S.originalLearningLoading;
+  const type = S.originalLearningType;
+  const scope = S.originalLearningScope;
+
+  const resultItems = result && result.length > 0 ? result.map((item, idx) => `
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:${item.checked?'#FFF7F0':'#fff'};border-radius:12px;border:1.5px solid ${item.checked?'#F5762A':'#f0f0f0'};margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;"
+         onclick="(function(){S.originalLearningResult[${idx}].checked=!S.originalLearningResult[${idx}].checked;render()})()">
+      <div style="width:20px;height:20px;border-radius:6px;border:2px solid ${item.checked?'#F5762A':'#ddd'};background:${item.checked?'#F5762A':'#fff'};flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px">
+        ${item.checked?'<svg width="11" height="9" viewBox="0 0 12 10" fill="none"><path d="M1 5l3.5 3.5L11 1" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':''}
+      </div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:700;color:#F5762A;margin-bottom:3px">${esc(item.label)}</div>
+        <div style="font-size:13px;color:#3D2E28;line-height:1.5">${esc(item.text)}</div>
+        ${item.source?`<div style="font-size:11px;color:#aaa;margin-top:3px">来源：${esc(item.source)}</div>`:''}
+      </div>
+    </div>`).join('') : '';
+
+  const checkedCount = result ? result.filter(r=>r.checked).length : 0;
+
+  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh">
+    <div class="top-bar top-bar-sub">
+      <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="sub-page-title">学习中心</span>
+      <div style="width:36px;flex-shrink:0"></div>
+    </div>
+    <div style="padding:14px 16px 32px">
+      <!-- 范围切换 -->
+      <div style="display:flex;background:#fff;border-radius:12px;padding:4px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div onclick="setState({originalLearningScope:'global'});render()"
+             style="flex:1;text-align:center;padding:8px 0;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;${scope==='global'?'background:#F5762A;color:#fff;':'color:#999;'}">
+          全局通用
+        </div>
+        <div onclick="setState({originalLearningScope:'project'});render()"
+             style="flex:1;text-align:center;padding:8px 0;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.18s;${scope==='project'?'background:#F5762A;color:#fff;':'color:#999;'}">
+          当前项目
+        </div>
+      </div>
+      <!-- 类型切换 -->
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <div onclick="setState({originalLearningType:'account'});render()"
+             style="flex:1;text-align:center;padding:9px 0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:2px solid ${type==='account'?'#F5762A':'#e8e8e8'};background:${type==='account'?'#FFF7F0':'#fff'};color:${type==='account'?'#F5762A':'#999'};">
+          账号分析
+        </div>
+        <div onclick="setState({originalLearningType:'video'});render()"
+             style="flex:1;text-align:center;padding:9px 0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:2px solid ${type==='video'?'#F5762A':'#e8e8e8'};background:${type==='video'?'#FFF7F0':'#fff'};color:${type==='video'?'#F5762A':'#999'};">
+          视频分析
+        </div>
+      </div>
+      <!-- URL输入 -->
+      <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div style="font-size:13px;color:#888;margin-bottom:8px">粘贴${type==='account'?'账号主页':'视频'}链接</div>
+        <textarea id="learning-url-input" rows="2"
+          oninput="S.originalLearningUrl=this.value"
+          style="width:100%;border:1.5px solid #f0f0f0;border-radius:10px;padding:10px 12px;font-size:13px;color:#1A1614;resize:none;outline:none;box-sizing:border-box;background:#FAFAFA;font-family:inherit"
+          placeholder="https://...">${esc(S.originalLearningUrl)}</textarea>
+      </div>
+      <button type="button" onclick="analyzeOriginalLearning()"
+              style="width:100%;padding:13px 0;border:none;border-radius:14px;background:#F5762A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:16px;${loading?'opacity:0.6;':''}">
+        ${loading ? '分析中…' : '分析 · 10 积分'}
+      </button>
+      ${result === null ? `
+        <div style="text-align:center;padding:24px 0">
+          <div style="font-size:28px;margin-bottom:8px">🔍</div>
+          <div style="font-size:14px;color:#aaa">输入链接后点击分析<br>AI 会提炼创作规律</div>
+        </div>` : result.length === 0 ? `
+        <div style="text-align:center;padding:24px 0;color:#aaa;font-size:14px">未提炼到有效规律</div>` : `
+        <div style="font-size:14px;font-weight:700;color:#1A1614;margin-bottom:10px">提炼到 ${result.length} 条规律（选择要写入的）</div>
+        ${resultItems}
+        ${checkedCount > 0 ? `
+          <button type="button" onclick="writeOriginalLearning()"
+                  style="width:100%;padding:13px 0;border:none;border-radius:14px;background:#1A1614;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px">
+            写入 Skill · 已选 ${checkedCount} 条
+          </button>` : ''}`}
+    </div>
+  </div>`;
+}
+
+function tOriginalNew() {
+  const skill = S.originalSkill;
+  const loading = S.originalLoading;
+  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh">
+    <div class="top-bar top-bar-sub">
+      <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="sub-page-title">新建项目</span>
+      <div style="width:36px;flex-shrink:0"></div>
+    </div>
+    <div style="padding:14px 16px 32px">
+      <div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+        <div style="font-size:13px;color:#888;margin-bottom:6px;font-weight:600">视频主题 <span style="color:#E53E3E">*</span></div>
+        <input type="text" id="orig-new-title"
+          oninput="S.originalNewTitle=this.value"
+          value="${esc(S.originalNewTitle)}"
+          placeholder="例如：职场穿搭 / 副业变现 / 宝宝辅食"
+          style="width:100%;border:1.5px solid #f0f0f0;border-radius:10px;padding:10px 12px;font-size:14px;color:#1A1614;outline:none;box-sizing:border-box;font-family:inherit" />
+        <div style="font-size:13px;color:#888;margin:14px 0 6px;font-weight:600">创作目标 <span style="color:#999;font-weight:400;font-size:12px">（选填）</span></div>
+        <textarea id="orig-new-brief" rows="3"
+          oninput="S.originalNewBrief=this.value"
+          placeholder="这条视频想传达什么？目标受众是谁？有什么特别的要求？"
+          style="width:100%;border:1.5px solid #f0f0f0;border-radius:10px;padding:10px 12px;font-size:13px;color:#1A1614;resize:none;outline:none;box-sizing:border-box;font-family:inherit;line-height:1.6">${esc(S.originalNewBrief)}</textarea>
+      </div>
+      ${skill ? `
+        <div style="background:linear-gradient(135deg,#2A2320,#3D2E28);border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+          <div style="width:32px;height:32px;border-radius:10px;background:rgba(245,118,42,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F5762A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#F5762A">Skill 文档已加载</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px">v${esc(skill.version||'1.0')} · AI 将根据你的风格规律创作</div>
+          </div>
+        </div>` : ''}
+      <button type="button" onclick="createOriginalProject()"
+              style="width:100%;padding:14px 0;border:none;border-radius:14px;background:#F5762A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;${loading?'opacity:0.6;':''}">
+        ${loading ? '创建中…' : '开始创作 · 5 积分'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function tOriginalChat() {
+  const proj = S.originalProject;
+  const messages = S.originalMessages || [];
+  const tab = S.originalChatTab;
+  const loading = S.originalLoading;
+  if (!proj) return `<div class="page-content"><div style="padding:80px 16px;text-align:center;color:#aaa">项目数据加载中…</div></div>`;
+
+  const renderMsg = (msg) => {
+    const isUser = msg.role === 'user';
+    if (isUser) {
+      return `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <div style="max-width:76%;background:#F5762A;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;line-height:1.6">${esc(msg.content)}</div>
+      </div>`;
+    }
+    // AI message — strip 【新文案】block from display, show only the summary part
+    const displayContent = msg.content.replace(/【新文案】[\s\S]*?【\/新文案】/g, '').trim();
+    const syncCard = (msg.sync_label && msg.sync_done !== 'synced' && msg.sync_done !== 'skipped') ? `
+      <div style="margin-top:10px;background:#FFF7F0;border:1.5px solid #FFD9BC;border-radius:12px;padding:10px 12px">
+        <div style="font-size:11px;color:#F5762A;font-weight:700;margin-bottom:4px">💡 提炼到规律</div>
+        <div style="font-size:12px;color:#3D2E28;margin-bottom:8px">${esc(msg.sync_label)}</div>
+        <div style="display:flex;gap:8px">
+          <button type="button" onclick="syncOriginalRule(${msg.id},'${esc(msg.sync_label)}')"
+                  style="flex:1;padding:6px 0;border:none;border-radius:8px;background:#F5762A;color:#fff;font-size:12px;font-weight:700;cursor:pointer">同步·全局通用</button>
+          <button type="button" onclick="skipOriginalRule(${msg.id})"
+                  style="flex:1;padding:6px 0;border:none;border-radius:8px;background:#f0f0f0;color:#888;font-size:12px;cursor:pointer">跳过</button>
+        </div>
+      </div>` : (msg.sync_done === 'synced' ? `
+      <div style="margin-top:8px;font-size:11px;color:#22C55E;display:flex;align-items:center;gap:4px">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        已同步到 Skill
+      </div>` : '');
+    return `<div style="display:flex;justify-content:flex-start;margin-bottom:12px">
+      <div style="max-width:84%">
+        <div style="background:#fff;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14px;color:#1A1614;line-height:1.6;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
+          ${displayContent ? esc(displayContent) : '<span style="color:#aaa;font-style:italic">文案已更新，切到「当前文案」查看</span>'}
+          ${msg.has_doc_update ? `<div style="margin-top:6px;font-size:11px;color:#F5762A;display:flex;align-items:center;gap:4px">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            文案已更新
+          </div>` : ''}
+        </div>
+        ${syncCard}
+      </div>
+    </div>`;
+  };
+
+  const chatView = `<div id="orig-chat-scroll" style="flex:1;overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+    ${messages.length === 0
+      ? `<div style="text-align:center;padding:32px 0;color:#aaa;font-size:14px">告诉 AI 你想创作什么内容，或者直接提要求修改文案</div>`
+      : messages.map(renderMsg).join('')}
+    ${loading ? `<div style="display:flex;justify-content:flex-start;margin-bottom:12px">
+      <div style="background:#fff;border-radius:16px 16px 16px 4px;padding:10px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.05)">
+        <div style="display:flex;gap:4px;align-items:center">
+          <div style="width:6px;height:6px;border-radius:50%;background:#F5762A;animation:bounce 1s infinite 0s"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:#F5762A;animation:bounce 1s infinite 0.2s"></div>
+          <div style="width:6px;height:6px;border-radius:50%;background:#F5762A;animation:bounce 1s infinite 0.4s"></div>
+        </div>
+      </div>
+    </div>` : ''}
+  </div>`;
+
+  const docView = `<div style="flex:1;overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch">
+    ${proj.doc ? `<div style="background:#fff;border-radius:16px;padding:16px;font-size:14px;color:#1A1614;line-height:1.8;white-space:pre-wrap;box-shadow:0 2px 8px rgba(0,0,0,0.04)">${esc(proj.doc)}</div>` : `<div style="text-align:center;padding:48px 0;color:#aaa;font-size:14px">文案还没生成，开始对话让 AI 帮你写吧</div>`}
+  </div>`;
+
+  return `<div class="page-content" style="background:#F7F5F2;min-height:100vh;display:flex;flex-direction:column">
+    <div class="top-bar top-bar-sub" style="flex-shrink:0">
+      <button type="button" class="back-btn" onclick="setState({originalView:'home'});render()">
+        <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L2 7.5L7.5 13.5" stroke="#1A1814" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <span class="sub-page-title" style="font-size:15px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(proj.title)}</span>
+      <div style="width:36px;flex-shrink:0;text-align:right">
+        <span style="font-size:11px;color:${proj.status==='final'?'#22C55E':'#F5762A'};font-weight:600">${proj.status==='final'?'已定稿':'创作中'}</span>
+      </div>
+    </div>
+    <!-- Tab 切换 -->
+    <div style="display:flex;background:#fff;border-bottom:1px solid #f0f0f0;flex-shrink:0">
+      <div onclick="setState({originalChatTab:'chat'});render()"
+           style="flex:1;text-align:center;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;border-bottom:2.5px solid ${tab==='chat'?'#F5762A':'transparent'};color:${tab==='chat'?'#F5762A':'#aaa'};transition:all 0.18s">
+        对话
+      </div>
+      <div onclick="setState({originalChatTab:'doc'});render()"
+           style="flex:1;text-align:center;padding:10px 0;font-size:14px;font-weight:600;cursor:pointer;border-bottom:2.5px solid ${tab==='doc'?'#F5762A':'transparent'};color:${tab==='doc'?'#F5762A':'#aaa'};transition:all 0.18s">
+        当前文案${proj.doc?` <span style="font-size:10px;background:#F5762A;color:#fff;border-radius:6px;padding:1px 5px">已更新</span>`:''}
+      </div>
+    </div>
+    ${tab === 'chat' ? chatView : docView}
+    <!-- 输入框 -->
+    ${tab === 'chat' ? `<div style="padding:10px 14px 20px;background:#fff;border-top:1px solid #f0f0f0;flex-shrink:0;display:flex;gap:10px;align-items:flex-end">
+      <textarea id="orig-chat-input" rows="1"
+        oninput="S.originalInput=this.value;this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"
+        placeholder="说说你想怎么改，或者描述这条视频的内容…"
+        style="flex:1;border:1.5px solid #f0f0f0;border-radius:12px;padding:9px 12px;font-size:14px;resize:none;outline:none;background:#FAFAFA;font-family:inherit;line-height:1.5;max-height:100px;overflow-y:auto">${esc(S.originalInput)}</textarea>
+      <button type="button" onclick="sendOriginalMessage()"
+              style="width:40px;height:40px;flex-shrink:0;border:none;border-radius:12px;background:${loading||!S.originalInput.trim()?'#f0f0f0':'#F5762A'};display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background 0.18s">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${loading||!S.originalInput.trim()?'#bbb':'#fff'}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>` : ''}
+  </div>`;
+}
+
+async function openOriginalProject(id) {
+  setState({ originalLoading: true, originalView: 'chat', originalChatTab: 'chat', originalInput: '' });
+  render();
+  try {
+    const r = await api.get('/original/projects/' + id);
+    if (r.code === 200) {
+      setState({
+        originalProject: r.data.project,
+        originalMessages: r.data.messages || [],
+        originalLoading: false,
+      });
+    } else {
+      setState({ originalLoading: false });
+      showToast(r.msg || '加载失败');
+    }
+  } catch { setState({ originalLoading: false }); showToast('网络错误'); }
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('orig-chat-scroll');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 80);
+}
+
+async function createOriginalProject() {
+  const title = (document.getElementById('orig-new-title') ? document.getElementById('orig-new-title').value : S.originalNewTitle).trim();
+  const brief = (document.getElementById('orig-new-brief') ? document.getElementById('orig-new-brief').value : S.originalNewBrief).trim();
+  if (!title) { showToast('请填写视频主题'); return; }
+  if (S.originalLoading) return;
+  setState({ originalLoading: true, originalNewTitle: title, originalNewBrief: brief });
+  render();
+  try {
+    const r = await api.post('/original/projects', { title, brief });
+    if (r.code === 200) {
+      // Reload project list
+      const rProj = await api.get('/original/projects');
+      setState({
+        originalProjects: rProj.code === 200 ? rProj.data : S.originalProjects,
+        originalProject: r.data,
+        originalMessages: [],
+        originalLoading: false,
+        originalView: 'chat',
+        originalChatTab: 'chat',
+        originalInput: '',
+      });
+      showToast('项目已创建 ✓');
+    } else {
+      setState({ originalLoading: false });
+      showToast(r.msg || '创建失败');
+    }
+  } catch { setState({ originalLoading: false }); showToast('网络错误'); }
+  render();
+}
+
+async function sendOriginalMessage() {
+  const inputEl = document.getElementById('orig-chat-input');
+  const input = (inputEl ? inputEl.value : S.originalInput).trim();
+  if (!input || S.originalLoading || !S.originalProject) return;
+  setState({
+    originalInput: '',
+    originalLoading: true,
+    originalMessages: [...S.originalMessages, { role: 'user', content: input }],
+  });
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('orig-chat-scroll');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 40);
+  try {
+    const r = await api.post('/original/projects/' + S.originalProject.id + '/chat', { message: input });
+    if (r.code === 200) {
+      setState({
+        originalMessages: [...S.originalMessages, r.data.message],
+        originalProject: { ...S.originalProject, doc: r.data.doc, turns: r.data.turns },
+        originalLoading: false,
+      });
+    } else {
+      setState({ originalLoading: false });
+      showToast(r.msg || '发送失败');
+    }
+  } catch { setState({ originalLoading: false }); showToast('网络错误'); }
+  render();
+  setTimeout(() => {
+    const el = document.getElementById('orig-chat-scroll');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 80);
+}
+
+async function syncOriginalRule(msgId, label) {
+  try {
+    const r = await api.patch('/original/projects/' + S.originalProject.id, { msgId, syncDone: 'synced' });
+    if (r.code === 200) {
+      setState({
+        originalMessages: S.originalMessages.map(m => m.id === msgId ? { ...m, sync_done: 'synced' } : m),
+      });
+      // Refresh skill
+      const rSkill = await api.get('/original/skill');
+      if (rSkill.code === 200) setState({ originalSkill: rSkill.data });
+      showToast('已同步到 Skill ✓');
+    } else {
+      showToast(r.msg || '同步失败');
+    }
+  } catch { showToast('网络错误'); }
+  render();
+}
+
+async function skipOriginalRule(msgId) {
+  try {
+    await api.patch('/original/projects/' + S.originalProject.id, { msgId, syncDone: 'skipped' });
+    setState({
+      originalMessages: S.originalMessages.map(m => m.id === msgId ? { ...m, sync_done: 'skipped' } : m),
+    });
+  } catch {}
+  render();
+}
+
+async function analyzeOriginalLearning() {
+  const urlEl = document.getElementById('learning-url-input');
+  const url = (urlEl ? urlEl.value : S.originalLearningUrl).trim();
+  if (!url) { showToast('请粘贴链接'); return; }
+  if (S.originalLearningLoading) return;
+  setState({ originalLearningLoading: true, originalLearningUrl: url, originalLearningResult: null });
+  render();
+  try {
+    const projectId = S.originalLearningScope === 'project' && S.originalProject ? S.originalProject.id : null;
+    const r = await api.post('/original/learning/analyze', {
+      url,
+      type: S.originalLearningType,
+      scope: S.originalLearningScope,
+      projectId,
+    });
+    if (r.code === 200) {
+      let items = [];
+      if (r.data.type === 'account') {
+        items = (r.data.insights || []).map(item => ({
+          label: '账号规律',
+          text: item.text,
+          source: item.freq || '',
+          checked: true,
+        }));
+      } else {
+        // video type: single insight string
+        if (r.data.insight) {
+          items = [{ label: '视频规律', text: r.data.insight, source: '', checked: true }];
+        }
+      }
+      setState({ originalLearningResult: items, originalLearningLoading: false });
+    } else {
+      setState({ originalLearningLoading: false });
+      showToast(r.msg || '分析失败');
+    }
+  } catch { setState({ originalLearningLoading: false }); showToast('网络错误'); }
+  render();
+}
+
+async function writeOriginalLearning() {
+  const selected = (S.originalLearningResult || []).filter(r => r.checked);
+  if (selected.length === 0) { showToast('请至少选择一条'); return; }
+  try {
+    const skill = S.originalSkill || { rules: {}, keywords: [], forbidden: [] };
+    const rules = { ...(skill.rules || {}) };
+    const groupName = '学习中心同步';
+    if (!rules[groupName]) rules[groupName] = [];
+    selected.forEach(item => {
+      rules[groupName].push({ text: item.text, source: item.source || S.originalLearningUrl, uses: 0 });
+    });
+    const r = await api.put('/original/skill', { rules, keywords: skill.keywords || [], forbidden: skill.forbidden || [] });
+    if (r.code === 200) {
+      const rSkill = await api.get('/original/skill');
+      if (rSkill.code === 200) setState({ originalSkill: rSkill.data });
+      setState({ originalLearningResult: null, originalLearningUrl: '' });
+      showToast(`已写入 ${selected.length} 条规律 ✓`);
+    } else {
+      showToast(r.msg || '写入失败');
+    }
+  } catch { showToast('网络错误'); }
+  render();
+}
+
+function formatRelTime(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    const diff = Date.now() - d.getTime();
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff/60000) + '分钟前';
+    if (diff < 86400000) return Math.floor(diff/3600000) + '小时前';
+    if (diff < 2592000000) return Math.floor(diff/86400000) + '天前';
+    return d.toLocaleDateString('zh-CN', { month:'numeric', day:'numeric' });
+  } catch { return ''; }
 }
 
 // ===== INIT =====
